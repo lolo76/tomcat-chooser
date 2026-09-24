@@ -54,30 +54,18 @@ Dans l'onglet **Actions** du dépôt, ouvrez la dernière exécution et téléch
 **TomcatChooser-windows** : c'est un zip contenant `TomcatChooser.exe` et son Java embarqué
 (aucune installation de Java n'est nécessaire). Dézippez-le et lancez `TomcatChooser.exe`.
 
-## Construire une version autonome (sans Java installé sur le poste cible)
+## Construire l'exe Windows soi-même (depuis Eclipse)
 
-```bat
-mvn clean package javafx:jlink
-```
+1. Clic droit sur le projet > Run As > **Maven build…**
+2. Goals : `clean package javafx:jlink exec:exec@jpackage`
+3. Onglet **JRE** : choisissez un **JDK 21** (pas un simple JRE : `jpackage` est fourni avec le JDK).
+4. Run.
 
-Résultat :
-- `target\tomcat-chooser\bin\tomcat-chooser.bat` : lanceur
-- `target\tomcat-chooser-windows.zip` : le même dossier zippé, à copier sur un autre poste
+Résultat : `target\dist\TomcatChooser\TomcatChooser.exe`, avec l'icône Tomcat et son propre Java.
+Copiez tout le dossier `target\dist\TomcatChooser` sur un autre poste pour l'utiliser : il n'y a
+pas besoin d'y installer Java. Pour un installeur `.msi`, il faudrait en plus WiX Toolset.
 
-Pour obtenir un vrai `TomcatChooser.exe` :
-
-```bat
-jpackage --type app-image --name TomcatChooser ^
-  --runtime-image target\tomcat-chooser ^
-  --module fr.tomcatchooser/fr.tomcatchooser.TomcatChooserApp ^
-  --icon packaging\tomcat.ico ^
-  --dest target\dist
-```
-
-L'exécutable est alors `target\dist\TomcatChooser\TomcatChooser.exe`
-(ajoutez `--type msi` à la place de `app-image` pour un installeur, ce qui nécessite WiX Toolset).
-
-On peut aussi passer un fichier en argument : `tomcat-chooser.bat D:\autre\conf\server.xml`.
+On peut aussi passer un fichier en argument : `TomcatChooser.exe D:\autre\conf\server.xml`.
 
 ## Tests
 

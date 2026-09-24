@@ -88,6 +88,67 @@
                     <compress>2</compress>
                 </configuration>
             </plugin>
+            <!-- Exe Windows : mvn clean package javafx:jlink exec:exec@jpackage -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>jpackage</id>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${jpackage.executable}</executable>
+                            <arguments>
+                                <argument>--type</argument>
+                                <argument>app-image</argument>
+                                <argument>--name</argument>
+                                <argument>TomcatChooser</argument>
+                                <argument>--app-version</argument>
+                                <argument>${project.version}</argument>
+                                <argument>--runtime-image</argument>
+                                <argument>${project.build.directory}/tomcat-chooser</argument>
+                                <argument>--module</argument>
+                                <argument>${mainClass}</argument>
+                                <argument>--icon</argument>
+                                <argument>${jpackage.icon}</argument>
+                                <argument>--dest</argument>
+                                <argument>${project.build.directory}/dist</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- jpackage est pris dans le JDK qui exécute Maven (celui configuré dans Eclipse) -->
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <jpackage.executable>${java.home}\bin\jpackage.exe</jpackage.executable>
+                <jpackage.icon>${project.basedir}\packaging\tomcat.ico</jpackage.icon>
+            </properties>
+        </profile>
+        <profile>
+            <id>unix</id>
+            <activation>
+                <os>
+                    <family>unix</family>
+                </os>
+            </activation>
+            <properties>
+                <jpackage.executable>${java.home}/bin/jpackage</jpackage.executable>
+                <jpackage.icon>${project.basedir}/packaging/tomcat.png</jpackage.icon>
+            </properties>
+        </profile>
+    </profiles>
 </project>

@@ -17,20 +17,8 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Tests, puis image jlink
-        run: mvn -B package javafx:jlink
-
-      - name: Exe avec jpackage
-        shell: pwsh
-        run: |
-          jpackage --type app-image --name TomcatChooser `
-            --runtime-image target\tomcat-chooser `
-            --module fr.tomcatchooser/fr.tomcatchooser.TomcatChooserApp `
-            --icon packaging\tomcat.ico `
-            --app-version 1.0.0 `
-            --vendor "Laurent" `
-            --dest target\dist
-          Get-ChildItem target\dist\TomcatChooser
+      - name: Tests, image jlink et exe (jpackage)
+        run: mvn -B clean package javafx:jlink exec:exec@jpackage
 
       - name: Publier l'exe
         uses: actions/upload-artifact@v4
