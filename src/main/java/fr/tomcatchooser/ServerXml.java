@@ -29,6 +29,8 @@ public final class ServerXml {
 
     private static final Pattern ENCODING_DECL =
             Pattern.compile("<\\?xml[^>]*encoding\\s*=\\s*[\"']([A-Za-z0-9._-]+)[\"']");
+    private static final Pattern CLOSING_CONTEXT = Pattern.compile("</Context\\s*>");
+    private static final Pattern COMMENT = Pattern.compile("<!--(.*?)-->", Pattern.DOTALL);
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
     private final Path file;
@@ -99,10 +101,39 @@ public final class ServerXml {
                     + " contient \"--\" (par exemple un commentaire interne) : "
                     + "un commentaire XML ne peut pas l'englober. Modifiez-le à la main.");
         }
-        return text.substring(0, e.start()) + "<!-- " + element + " -->" + text.substring(e.end());
+        if (!element.contains("\n")) {
+            return text.substring(0, e.start()) + "<!-- " + element + " -->" + text.substring(e.end());
+        }
+        // Context sur plusieurs lignes : chaque ligne est commentée séparément (comme Eclipse).
+        StringBuilder out = new StringBuilder(text.substring(0, e.start()));
+        for (String line : element.split("(?<=\n)")) {
+            int k = line.length();
+            while (k > 0 && Character.isWhitespace(line.charAt(k - 1))) {
+                k--;
+            }
+            int lead = horizontalWhitespace(line, 0);
+            if (lead >= k) {
+                out.append(line);
+            } else {
+                out.append(line, 0, lead).append("<!-- ").append(line, lead, k).append(" -->")
+                        .append(line.substring(k));
+            }
+        }
+        return out.append(text.substring(e.end())).toString();
     }
 
     static String uncomment(String text, ContextEntry e) {
+        String region = text.substring(e.start(), e.end());
+        if (region.indexOf("<!--", 4) >= 0) {
+            // Bloc commenté ligne par ligne : on retire les marques de chaque commentaire.
+            Matcher m = COMMENT.matcher(region);
+            StringBuilder out = new StringBuilder();
+            while (m.find()) {
+                m.appendReplacement(out, Matcher.quoteReplacement(stripHorizontal(m.group(1))));
+            }
+            m.appendTail(out);
+            return text.substring(0, e.start()) + out + text.substring(e.end());
+        }
         int start = e.start();
         int end = e.end();
         String inner = text.substring(start + 4, end - 3);
@@ -203,6 +234,13 @@ public final class ServerXml {
                 String inner = text.substring(comment + 4, close).strip();
                 if (findContextTag(inner, 0) == 0 && elementEnd(inner, 0) == inner.length()) {
                     result.add(entry(result.size(), text, comment, end, true, inner));
+                } else if (findContextTag(inner, 0) == 0 && openTagEnd(inner, 0) == inner.length()) {
+                    // Context commenté ligne par ligne : <!-- <Context ...> --> ... <!-- </Context> -->
+                    int blockEnd = lineByLineBlockEnd(text, end);
+                    if (blockEnd > 0) {
+                        result.add(entry(result.size(), text, comment, blockEnd, true, inner));
+                        end = blockEnd;
+                    }
                 }
                 i = end;
             } else {
@@ -215,6 +253,36 @@ public final class ServerXml {
             }
         }
         return List.copyOf(result);
+    }
+
+    /**
+     * À partir de from (juste après le commentaire {@code <!-- <Context ...> -->}), cherche une suite de
+     * commentaires séparés uniquement par des blancs et terminée par {@code <!-- </Context> -->}.
+     *
+     * @return la fin (exclusive) du dernier commentaire, ou -1 si ce n'est pas un bloc complet
+     */
+    private static int lineByLineBlockEnd(String text, int from) {
+        int j = from;
+        while (true) {
+            while (j < text.length() && Character.isWhitespace(text.charAt(j))) {
+                j++;
+            }
+            if (!text.startsWith("<!--", j)) {
+                return -1;
+            }
+            int close = text.indexOf("-->", j + 4);
+            if (close < 0) {
+                return -1;
+            }
+            String inner = text.substring(j + 4, close).strip();
+            if (CLOSING_CONTEXT.matcher(inner).matches()) {
+                return close + 3;
+            }
+            if (findContextTag(inner, 0) == 0) {
+                return -1; // un autre Context commence : bloc incomplet
+            }
+            j = close + 3;
+        }
     }
 
     private static ContextEntry entry(int index, String text, int start, int end, boolean commented,
@@ -317,6 +385,15 @@ public final class ServerXml {
             k--;
         }
         return s.length() - k;
+    }
+
+    private static String stripHorizontal(String s) {
+        int a = horizontalWhitespace(s, 0);
+        int b = s.length();
+        while (b > a && (s.charAt(b - 1) == ' ' || s.charAt(b - 1) == '\t')) {
+            b--;
+        }
+        return s.substring(a, b);
     }
 
     private static int horizontalWhitespace(String s, int from) {

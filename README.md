@@ -20,6 +20,9 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
   - `server.xml.bak` contient l'état juste avant la dernière modification.
 - L'application refuse d'écrire si le résultat n'est plus du XML valide, et recharge la liste
   si le fichier a été modifié à la main entre-temps.
+- Les Context commentés ligne par ligne (une balise `<!-- <Context …> -->`, puis chaque ligne
+  commentée, puis `<!-- </Context> -->`, comme le fait Eclipse) sont reconnus et décommentés ligne
+  par ligne. Un Context sur plusieurs lignes est lui aussi commenté ligne par ligne.
 - Un Context qui contient lui-même un commentaire (`<!-- -->`) ne peut pas être commenté
   automatiquement (XML interdit les commentaires imbriqués) : un message l'indique.
 - Pensez à redémarrer Tomcat pour que la modification soit prise en compte.
@@ -56,6 +59,7 @@ Pour obtenir un vrai `TomcatChooser.exe` :
 jpackage --type app-image --name TomcatChooser ^
   --runtime-image target\tomcat-chooser ^
   --module fr.tomcatchooser/fr.tomcatchooser.TomcatChooserApp ^
+  --icon packaging\tomcat.ico ^
   --dest target\dist
 ```
 
@@ -81,5 +85,10 @@ src/main/java/module-info.java
 src/main/java/fr/tomcatchooser/TomcatChooserApp.java   fenêtre JavaFX
 src/main/java/fr/tomcatchooser/ServerXml.java          lecture / modification de server.xml
 src/main/java/fr/tomcatchooser/ContextEntry.java       un Context trouvé
+src/main/resources/fr/tomcatchooser/tomcat-*.png       icône de la fenêtre (logo Apache Tomcat)
 src/test/java/fr/tomcatchooser/ServerXmlTest.java      tests JUnit 5
+packaging/tomcat.ico                                   icône de l'exécutable (jpackage)
 ```
+
+Le logo Apache Tomcat est une marque de l'Apache Software Foundation, repris du dépôt
+[apache/tomcat](https://github.com/apache/tomcat) (licence Apache 2.0).

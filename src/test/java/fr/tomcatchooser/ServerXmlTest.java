@@ -147,4 +147,49 @@ class ServerXmlTest {
         xml.toggle(xml.contexts().get(0));
         assertEquals(latin, new String(Files.readAllBytes(f), StandardCharsets.ISO_8859_1));
     }
+
+    private static final String LIGNE_PAR_LIGNE = """
+            <?xml version='1.0' encoding='utf-8'?>
+            <Server port="8005" shutdown="SHUTDOWN">
+              <Service name="Catalina">
+                <Engine name="Catalina" defaultHost="localhost">
+                  <Host name="localhost" appBase="webapps">
+            <!-- <Context path="/Sireo_CG44" reloadable="false" docBase="C:\\eclipse\\workspace\\Sireo_CG44\\src\\main\\webapp" workDir="C:\\eclipse\\workspace\\Sireo_CG44\\work" > -->
+            \t<!-- <Logger className="org.apache.catalina.logger.SystemOutLogger" verbosity="4" timestamp="true"/> -->
+            \t<!-- <Loader className="org.apache.catalina.loader.DevLoader" reloadable="true" debug="1" useSystemClassLoaderAsParent="false" /> -->
+            <!-- </Context> -->
+                    <Context path="/autre" docBase="C:/apps/autre"/>
+                  </Host>
+                </Engine>
+              </Service>
+            </Server>
+            """.replace("\n", "\r\n");
+
+    @Test
+    void litUnContextCommenteLigneParLigne() throws Exception {
+        Path f = write(LIGNE_PAR_LIGNE);
+        ServerXml xml = ServerXml.load(f);
+        List<ContextEntry> c = xml.contexts();
+        assertEquals(2, c.size());
+        assertEquals("/Sireo_CG44", c.get(0).path());
+        assertEquals("C:\\eclipse\\workspace\\Sireo_CG44\\src\\main\\webapp", c.get(0).docBase());
+        assertTrue(c.get(0).commented());
+        assertEquals(6, c.get(0).line());
+        assertEquals("/autre", c.get(1).path());
+
+        xml.toggle(c.get(0));
+        String active = Files.readString(f);
+        assertTrue(active.contains("""
+                <Context path="/Sireo_CG44" reloadable="false" docBase="C:\\eclipse\\workspace\\Sireo_CG44\\src\\main\\webapp" workDir="C:\\eclipse\\workspace\\Sireo_CG44\\work" >
+                \t<Logger className="org.apache.catalina.logger.SystemOutLogger" verbosity="4" timestamp="true"/>
+                \t<Loader className="org.apache.catalina.loader.DevLoader" reloadable="true" debug="1" useSystemClassLoaderAsParent="false" />
+                </Context>
+                """.replace("\n", "\r\n")), active);
+        assertFalse(ServerXml.load(f).contexts().get(0).commented());
+
+        // Recommenter redonne exactement le format ligne par ligne d'origine.
+        xml = ServerXml.load(f);
+        xml.toggle(xml.contexts().get(0));
+        assertEquals(LIGNE_PAR_LIGNE, Files.readString(f));
+    }
 }

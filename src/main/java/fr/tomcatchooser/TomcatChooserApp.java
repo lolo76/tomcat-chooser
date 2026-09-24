@@ -21,6 +21,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -67,6 +68,10 @@ public class TomcatChooserApp extends Application {
         BorderPane.setMargin(table, new Insets(0, 10, 0, 10));
 
         stage.setTitle("Tomcat Chooser");
+        for (int size : new int[] {16, 32, 48, 64, 128, 256}) {
+            stage.getIcons().add(new Image(
+                    TomcatChooserApp.class.getResourceAsStream("tomcat-" + size + ".png")));
+        }
         stage.setScene(new Scene(root, 900, 500));
         stage.show();
 
