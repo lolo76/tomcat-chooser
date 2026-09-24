@@ -38,7 +38,8 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
         setHeaderText("Application : " + entry.displayPath() + (entry.commented() ? "   (inactif)" : "   (actif)"));
         setResizable(true);
 
-        VBox sections = new VBox(8);
+        VBox sections = new VBox(10);
+        sections.setPadding(new Insets(12, 16, 12, 12));
         byTag.forEach((tag, attributes) -> {
             Node body;
             if (attributes == null) {
@@ -51,14 +52,15 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
                 body = editor;
             }
             TitledPane pane = new TitledPane(tag, body);
-            pane.setExpanded(attributes != null);
+            // Seul le Context est déplié ; Logger et Loader s'ouvrent d'un clic.
+            pane.setExpanded(tag.equals("Context"));
             sections.getChildren().add(pane);
         });
 
         ScrollPane scroll = new ScrollPane(sections);
         scroll.setFitToWidth(true);
-        scroll.setPrefViewportHeight(520);
-        scroll.setPrefViewportWidth(820);
+        scroll.setPrefViewportHeight(560);
+        scroll.setPrefViewportWidth(900);
         getDialogPane().setContent(scroll);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         ((Button) getDialogPane().lookupButton(ButtonType.OK)).setText("Enregistrer");
@@ -81,6 +83,7 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
 
         AttributeEditor(Map<String, String> attributes) {
             super(10);
+            setPadding(new Insets(8));
             attributes.forEach(this::addRow);
 
             TextField newName = new TextField();
