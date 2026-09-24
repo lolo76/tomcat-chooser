@@ -89,9 +89,8 @@ class ServerXmlTest {
         xml.toggle(xml.contexts().get(0));
         assertTrue(Files.readString(f).contains(
                 "    <!-- <Context path=\"/appli1\" docBase=\"C:/apps/appli1\" reloadable=\"true\"/> -->\r\n"));
-        assertTrue(Files.exists(dir.resolve("server.xml.bak")));
-        assertTrue(Files.exists(dir.resolve("server.xml.orig")));
-        assertEquals(SERVER_XML, Files.readString(dir.resolve("server.xml.bak")));
+        assertFalse(Files.exists(dir.resolve("server.xml.bak")));
+        assertEquals(SERVER_XML, Files.readString(dir.resolve("server.xml.orig")));
     }
 
     @Test

@@ -182,8 +182,7 @@ public class TomcatChooserApp extends Application {
             refresh();
             table.getSelectionModel().select(updated.index());
             setStatus("Context " + updated.displayPath() + (updated.commented() ? " désactivé (commenté)" : " activé (décommenté)")
-                    + ". Sauvegarde précédente : " + serverXml.file().getFileName()
-                    + ".bak. Redémarrez Tomcat pour appliquer.", false);
+                    + ". Redémarrez Tomcat pour appliquer.", false);
         } catch (Exception ex) {
             try {
                 serverXml.reload();

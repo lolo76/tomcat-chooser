@@ -73,7 +73,7 @@ public final class ServerXml {
 
     /**
      * Commente ou décommente le Context donné, puis enregistre le fichier
-     * (avec sauvegarde server.xml.bak, et server.xml.orig la première fois).
+     * (avec une copie server.xml.orig la première fois).
      *
      * @return le Context dans son nouvel état
      */
@@ -154,7 +154,6 @@ public final class ServerXml {
         if (!Files.exists(orig)) {
             Files.copy(file, orig);
         }
-        Files.copy(file, dir.resolve(name + ".bak"), StandardCopyOption.REPLACE_EXISTING);
 
         byte[] body = newText.getBytes(charset);
         byte[] out = body;

@@ -16,9 +16,7 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 - La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.
 - Seule la zone du Context change : indentation, autres commentaires, fins de ligne et encodage
   du fichier sont conservés.
-- Avant chaque écriture :
-  - `server.xml.orig` est créé la première fois (copie du fichier d'origine, jamais écrasée) ;
-  - `server.xml.bak` contient l'état juste avant la dernière modification.
+- À la première modification, `server.xml.orig` est créé (copie du fichier d'origine, jamais écrasée).
 - L'application refuse d'écrire si le résultat n'est plus du XML valide, et recharge la liste
   si le fichier a été modifié à la main entre-temps.
 - Les Context commentés ligne par ligne (une balise `<!-- <Context …> -->`, puis chaque ligne
