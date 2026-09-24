@@ -47,6 +47,13 @@ cd tomcat-chooser
 mvn javafx:run
 ```
 
+## Télécharger l'exe Windows
+
+À chaque commit sur `main`, GitHub Actions construit l'exe sous Windows (workflow « Exe Windows »).
+Dans l'onglet **Actions** du dépôt, ouvrez la dernière exécution et téléchargez l'artefact
+**TomcatChooser-windows** : c'est un zip contenant `TomcatChooser.exe` et son Java embarqué
+(aucune installation de Java n'est nécessaire). Dézippez-le et lancez `TomcatChooser.exe`.
+
 ## Construire une version autonome (sans Java installé sur le poste cible)
 
 ```bat

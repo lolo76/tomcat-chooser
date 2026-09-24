@@ -1,0 +1,39 @@
+name: Exe Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Tests, puis image jlink
+        run: mvn -B package javafx:jlink
+
+      - name: Exe avec jpackage
+        shell: pwsh
+        run: |
+          jpackage --type app-image --name TomcatChooser `
+            --runtime-image target\tomcat-chooser `
+            --module fr.tomcatchooser/fr.tomcatchooser.TomcatChooserApp `
+            --icon packaging\tomcat.ico `
+            --app-version 1.0.0 `
+            --vendor "Laurent" `
+            --dest target\dist
+          Get-ChildItem target\dist\TomcatChooser
+
+      - name: Publier l'exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: TomcatChooser-windows
+          path: target/dist/TomcatChooser/
