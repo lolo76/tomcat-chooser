@@ -101,25 +101,7 @@ public final class ServerXml {
                     + " contient \"--\" (par exemple un commentaire interne) : "
                     + "un commentaire XML ne peut pas l'englober. Modifiez-le à la main.");
         }
-        if (!element.contains("\n")) {
-            return text.substring(0, e.start()) + "<!-- " + element + " -->" + text.substring(e.end());
-        }
-        // Context sur plusieurs lignes : chaque ligne est commentée séparément (comme Eclipse).
-        StringBuilder out = new StringBuilder(text.substring(0, e.start()));
-        for (String line : element.split("(?<=\n)")) {
-            int k = line.length();
-            while (k > 0 && Character.isWhitespace(line.charAt(k - 1))) {
-                k--;
-            }
-            int lead = horizontalWhitespace(line, 0);
-            if (lead >= k) {
-                out.append(line);
-            } else {
-                out.append(line, 0, lead).append("<!-- ").append(line, lead, k).append(" -->")
-                        .append(line.substring(k));
-            }
-        }
-        return out.append(text.substring(e.end())).toString();
+        return text.substring(0, e.start()) + "<!-- " + element + " -->" + text.substring(e.end());
     }
 
     static String uncomment(String text, ContextEntry e) {

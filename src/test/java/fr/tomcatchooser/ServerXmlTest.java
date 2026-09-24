@@ -187,9 +187,12 @@ class ServerXmlTest {
                 """.replace("\n", "\r\n")), active);
         assertFalse(ServerXml.load(f).contexts().get(0).commented());
 
-        // Recommenter redonne exactement le format ligne par ligne d'origine.
+        // Recommenter englobe tout le bloc dans un seul commentaire.
         xml = ServerXml.load(f);
         xml.toggle(xml.contexts().get(0));
-        assertEquals(LIGNE_PAR_LIGNE, Files.readString(f));
+        String recommented = Files.readString(f);
+        assertTrue(recommented.contains("<!-- <Context path=\"/Sireo_CG44\""), recommented);
+        assertTrue(recommented.contains("useSystemClassLoaderAsParent=\"false\" />\r\n</Context> -->"), recommented);
+        assertTrue(ServerXml.load(f).contexts().get(0).commented());
     }
 }

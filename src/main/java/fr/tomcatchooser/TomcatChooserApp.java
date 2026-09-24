@@ -12,6 +12,9 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -26,6 +29,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.stage.FileChooser;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 
 /** Fenêtre principale : liste des Context de server.xml avec un bouton pour (dé)commenter chacun. */
@@ -33,6 +37,8 @@ public class TomcatChooserApp extends Application {
 
     static final Path DEFAULT_SERVER_XML = Paths.get("C:\\Tomcat70\\conf\\server.xml");
     private static final String PREF_LAST_FILE = "lastServerXml";
+    private static final double ROW_HEIGHT = 30;
+    private static final int MIN_VISIBLE_ROWS = 3;
 
     private final Preferences prefs = Preferences.userNodeForPackage(TomcatChooserApp.class);
     private final TextField pathField = new TextField();
@@ -72,7 +78,7 @@ public class TomcatChooserApp extends Application {
             stage.getIcons().add(new Image(
                     TomcatChooserApp.class.getResourceAsStream("tomcat-" + size + ".png")));
         }
-        stage.setScene(new Scene(root, 900, 500));
+        stage.setScene(new Scene(root));
         stage.show();
 
         String param = getParameters().getRaw().isEmpty() ? null : getParameters().getRaw().get(0);
@@ -81,26 +87,6 @@ public class TomcatChooserApp extends Application {
     }
 
     private void buildTable() {
-        TableColumn<ContextEntry, ContextEntry> state = new TableColumn<>("État");
-        state.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue()));
-        state.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(ContextEntry item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                } else if (item.commented()) {
-                    setText("○ Commenté");
-                    setStyle("-fx-text-fill: #888888;");
-                } else {
-                    setText("● Actif");
-                    setStyle("-fx-text-fill: #1a7f37; -fx-font-weight: bold;");
-                }
-            }
-        });
-        state.setPrefWidth(110);
-
         TableColumn<ContextEntry, String> path = new TableColumn<>("Path");
         path.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().displayPath()));
         path.setPrefWidth(180);
@@ -109,11 +95,7 @@ public class TomcatChooserApp extends Application {
         docBase.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().docBase()));
         docBase.setPrefWidth(400);
 
-        TableColumn<ContextEntry, Number> line = new TableColumn<>("Ligne");
-        line.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue().line()));
-        line.setPrefWidth(60);
-
-        TableColumn<ContextEntry, ContextEntry> action = new TableColumn<>("Action");
+        TableColumn<ContextEntry, ContextEntry> action = new TableColumn<>("Statut");
         action.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue()));
         action.setCellFactory(col -> new TableCell<>() {
             private final Button button = new Button();
@@ -129,21 +111,25 @@ public class TomcatChooserApp extends Application {
                 if (empty || item == null) {
                     setGraphic(null);
                 } else {
-                    button.setText(item.commented() ? "Décommenter" : "Commenter");
+                    // Le bouton montre l'état ; un clic bascule vers l'autre état.
+                    button.setText(item.commented() ? "Inactif" : "Actif");
+                    button.setStyle(item.commented()
+                            ? "-fx-base: #e0e0e0; -fx-text-fill: #666666;"
+                            : "-fx-base: #2e7d32; -fx-text-fill: white; -fx-font-weight: bold;");
                     button.setTooltip(new Tooltip(item.rawText()));
                     setGraphic(button);
                 }
             }
         });
-        action.setPrefWidth(120);
+        action.setPrefWidth(110);
         action.setSortable(false);
 
-        table.getColumns().add(state);
         table.getColumns().add(path);
         table.getColumns().add(docBase);
-        table.getColumns().add(line);
         table.getColumns().add(action);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        table.setFixedCellSize(ROW_HEIGHT);
+        table.setPrefWidth(760);
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
     }
 
@@ -195,7 +181,7 @@ public class TomcatChooserApp extends Application {
             ContextEntry updated = serverXml.toggle(entry);
             refresh();
             table.getSelectionModel().select(updated.index());
-            setStatus("Context " + updated.displayPath() + (updated.commented() ? " commenté" : " décommenté")
+            setStatus("Context " + updated.displayPath() + (updated.commented() ? " désactivé (commenté)" : " activé (décommenté)")
                     + ". Sauvegarde précédente : " + serverXml.file().getFileName()
                     + ".bak. Redémarrez Tomcat pour appliquer.", false);
         } catch (Exception ex) {
@@ -216,6 +202,39 @@ public class TomcatChooserApp extends Application {
     private void refresh() {
         table.setItems(FXCollections.observableArrayList(serverXml.contexts()));
         table.refresh();
+        fitWindowToRows();
+    }
+
+    /** Agrandit la fenêtre pour afficher toutes les lignes, sans dépasser l'écran. */
+    private void fitWindowToRows() {
+        table.applyCss();
+        table.layout();
+        Node header = table.lookup(".column-header-background");
+        double headerHeight = header == null ? 25 : header.prefHeight(-1);
+        int rows = Math.max(MIN_VISIBLE_ROWS, table.getItems().size());
+        double tableHeight = headerHeight + rows * ROW_HEIGHT + 4;
+
+        Rectangle2D screen = Screen.getScreensForRectangle(stage.getX(), stage.getY(), 1, 1).stream()
+                .findFirst().orElse(Screen.getPrimary()).getVisualBounds();
+        Parent root = stage.getScene().getRoot();
+        table.setPrefHeight(tableHeight);
+        double others = root.prefHeight(-1) - tableHeight;
+        double decorations = Math.max(0, stage.getHeight() - stage.getScene().getHeight());
+        double available = screen.getHeight() - decorations - others;
+        if (tableHeight > available) {
+            table.setPrefHeight(Math.max(headerHeight + ROW_HEIGHT, available));
+        }
+        stage.sizeToScene();
+        if (stage.getWidth() > screen.getWidth()) {
+            stage.setWidth(screen.getWidth());
+        }
+        // Garde la fenêtre entièrement visible après l'agrandissement.
+        if (stage.getY() + stage.getHeight() > screen.getMaxY()) {
+            stage.setY(Math.max(screen.getMinY(), screen.getMaxY() - stage.getHeight()));
+        }
+        if (stage.getX() + stage.getWidth() > screen.getMaxX()) {
+            stage.setX(Math.max(screen.getMinX(), screen.getMaxX() - stage.getWidth()));
+        }
     }
 
     private void setStatus(String message, boolean error) {

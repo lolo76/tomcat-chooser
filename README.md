@@ -10,9 +10,10 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 - Au démarrage, le fichier ouvert est `C:\Tomcat70\conf\server.xml`
   (ou le dernier fichier choisi, mémorisé automatiquement).
 - **Parcourir…** permet de choisir un autre `server.xml` ; on peut aussi taper le chemin puis Entrée.
-- Chaque ligne affiche l'état (Actif / Commenté), le `path`, le `docBase` et le numéro de ligne.
-- Le bouton **Commenter** transforme `<Context …/>` en `<!-- <Context …/> -->` ;
-  **Décommenter** fait l'inverse (y compris pour un bloc `<!-- … -->` sur plusieurs lignes).
+- Chaque ligne affiche le `path`, le `docBase` et un bouton d'état : **Actif** (vert) ou **Inactif** (gris).
+- Cliquer sur **Actif** commente le Context entier dans un seul bloc `<!-- … -->` ;
+  cliquer sur **Inactif** le décommente (y compris un bloc `<!-- … -->` sur plusieurs lignes).
+- La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.
 - Seule la zone du Context change : indentation, autres commentaires, fins de ligne et encodage
   du fichier sont conservés.
 - Avant chaque écriture :
@@ -22,7 +23,7 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
   si le fichier a été modifié à la main entre-temps.
 - Les Context commentés ligne par ligne (une balise `<!-- <Context …> -->`, puis chaque ligne
   commentée, puis `<!-- </Context> -->`, comme le fait Eclipse) sont reconnus et décommentés ligne
-  par ligne. Un Context sur plusieurs lignes est lui aussi commenté ligne par ligne.
+  par ligne.
 - Un Context qui contient lui-même un commentaire (`<!-- -->`) ne peut pas être commenté
   automatiquement (XML interdit les commentaires imbriqués) : un message l'indique.
 - Pensez à redémarrer Tomcat pour que la modification soit prise en compte.
