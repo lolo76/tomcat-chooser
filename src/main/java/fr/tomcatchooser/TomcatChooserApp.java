@@ -4,6 +4,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.prefs.Preferences;
@@ -84,11 +85,16 @@ public class TomcatChooserApp extends Application {
             filtered.setPredicate(c -> q.isEmpty() || c.displayPath().toLowerCase().contains(q));
         });
         HBox.setHgrow(search, Priority.ALWAYS);
-        HBox searchBar = new HBox(8, new Label("Rechercher :"), search);
+        Label searchLabel = new Label("Rechercher :");
+        HBox searchBar = new HBox(8, searchLabel, search);
         searchBar.setAlignment(Pos.CENTER_LEFT);
         searchBar.setPadding(new Insets(0, 10, 8, 10));
 
         buildTable();
+        // Le libellé a la largeur de la colonne Statut : le champ s'aligne sur la colonne Application.
+        TableColumn<ContextEntry, ?> statusColumn = table.getColumns().get(0);
+        searchLabel.minWidthProperty().bind(statusColumn.widthProperty().subtract(8));
+        searchLabel.prefWidthProperty().bind(statusColumn.widthProperty().subtract(8));
 
         status.setPadding(new Insets(6, 10, 8, 10));
         status.setWrapText(true);
@@ -161,8 +167,8 @@ public class TomcatChooserApp extends Application {
             });
             return row;
         });
-        table.getColumns().add(application);
         table.getColumns().add(action);
+        table.getColumns().add(application);
         table.setFixedCellSize(ROW_HEIGHT);
         table.setPrefWidth(460);
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
@@ -250,13 +256,22 @@ public class TomcatChooserApp extends Application {
         if (serverXml == null || entry == null) {
             return;
         }
-        Optional<Map<String, String>> result =
-                new ContextEditorDialog(stage, entry, serverXml.attributes(entry)).showAndWait();
-        if (result.isEmpty() || result.get().equals(serverXml.attributes(entry))) {
+        Map<String, Map<String, String>> current = new LinkedHashMap<>();
+        for (String tag : ServerXml.EDITABLE_TAGS) {
+            current.put(tag, serverXml.attributes(entry, tag));
+        }
+        Optional<Map<String, Map<String, String>>> result =
+                new ContextEditorDialog(stage, entry, current).showAndWait();
+        if (result.isEmpty()) {
+            return;
+        }
+        Map<String, Map<String, String>> changed = new LinkedHashMap<>(result.get());
+        changed.entrySet().removeIf(e -> e.getValue().equals(current.get(e.getKey())));
+        if (changed.isEmpty()) {
             return;
         }
         try {
-            ContextEntry updated = serverXml.updateAttributes(entry, result.get());
+            ContextEntry updated = serverXml.updateTags(entry, changed);
             refresh();
             select(updated);
             setStatus("Context " + updated.displayPath() + " modifié. Redémarrez Tomcat pour appliquer.", false);

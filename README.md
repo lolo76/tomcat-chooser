@@ -16,7 +16,8 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 - La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.
 - Le champ **Rechercher** filtre la liste sur le nom de l'application.
 - Un **double-clic** sur une ligne ouvre une fenêtre pour modifier les attributs du Context
-  (path, docBase, reloadable, workDir…) : modifier une valeur, supprimer (✕) ou ajouter un attribut.
+  (path, docBase, reloadable, workDir…) et ceux de ses éléments `<Logger>` et `<Loader>` :
+  modifier une valeur, supprimer (✕) ou ajouter un attribut. Les valeurs true/false sont des boutons.
   Cela fonctionne aussi pour un Context inactif (commenté).
 - Seule la zone du Context change : indentation, autres commentaires, fins de ligne et encodage
   du fichier sont conservés.

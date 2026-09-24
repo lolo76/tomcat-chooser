@@ -8,9 +8,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -90,33 +92,66 @@ public final class ServerXml {
         return contexts.get(entry.index());
     }
 
+    /** Balises modifiables : le Context lui-même et ses éléments enfants Logger et Loader. */
+    public static final List<String> EDITABLE_TAGS = List.of("Context", "Logger", "Loader");
+
     /** Attributs de la balise {@code <Context>}, dans l'ordre du fichier (valeurs décodées). */
     public Map<String, String> attributes(ContextEntry entry) {
+        return attributes(entry, "Context");
+    }
+
+    /**
+     * Attributs de la balise donnée (Context, ou premier Logger / Loader à l'intérieur du Context),
+     * ou null si la balise n'existe pas dans ce Context.
+     */
+    public Map<String, String> attributes(ContextEntry entry, String tagName) {
+        int start = tagStart(text, entry, tagName);
+        if (start < 0) {
+            return null;
+        }
         Map<String, String> result = new LinkedHashMap<>();
-        Matcher m = ATTRIBUTE.matcher(openingTag(text, entry));
+        Matcher m = ATTRIBUTE.matcher(text.substring(start, openTagEnd(text, start)));
         while (m.find()) {
             result.put(m.group(1), unescape(m.group(3) != null ? m.group(3) : m.group(4)));
         }
         return result;
     }
 
+    /** Remplace les attributs de la balise {@code <Context>}, puis enregistre. */
+    public ContextEntry updateAttributes(ContextEntry entry, Map<String, String> newAttributes) throws IOException {
+        return updateTags(entry, Map.of("Context", newAttributes));
+    }
+
     /**
-     * Remplace les attributs de la balise {@code <Context>} (actif ou commenté), puis enregistre.
+     * Remplace les attributs de plusieurs balises du Context (clé = nom de balise), puis enregistre en une fois.
      * Les attributs inchangés gardent leur texte exact ; les nouveaux sont ajoutés à la fin de la balise.
      *
      * @return le Context mis à jour
      */
-    public ContextEntry updateAttributes(ContextEntry entry, Map<String, String> newAttributes) throws IOException {
-        for (String name : newAttributes.keySet()) {
+    public ContextEntry updateTags(ContextEntry entry, Map<String, Map<String, String>> byTag)
+            throws IOException {
+        byTag.values().forEach(attrs -> attrs.keySet().forEach(name -> {
             if (!name.matches("[A-Za-z_:][A-Za-z0-9_:.-]*")) {
                 throw new IllegalArgumentException("Nom d'attribut invalide : \"" + name + "\"");
             }
-        }
+        }));
         ContextEntry current = reloadAndCheck(entry);
-        int tagStart = openingTagStart(text, current);
-        String tag = openingTag(text, current);
-        String newTag = rewriteTag(tag, newAttributes);
-        String newText = text.substring(0, tagStart) + newTag + text.substring(tagStart + tag.length());
+        // On remplace de la fin vers le début pour que les positions restent valables.
+        TreeMap<Integer, Map<String, String>> byPosition = new TreeMap<>(Comparator.reverseOrder());
+        for (Map.Entry<String, Map<String, String>> e : byTag.entrySet()) {
+            int start = tagStart(text, current, e.getKey());
+            if (start < 0) {
+                throw new IOException("Pas de balise <" + e.getKey() + "> dans ce Context.");
+            }
+            byPosition.put(start, e.getValue());
+        }
+        String newText = text;
+        for (Map.Entry<Integer, Map<String, String>> e : byPosition.entrySet()) {
+            int start = e.getKey();
+            String tag = newText.substring(start, openTagEnd(newText, start));
+            newText = newText.substring(0, start) + rewriteTag(tag, e.getValue())
+                    + newText.substring(start + tag.length());
+        }
         validateXml(newText);
         save(newText);
         return contexts.get(entry.index());
@@ -136,13 +171,16 @@ public final class ServerXml {
 
     // ---------------------------------------------------------------- édition
 
-    private static int openingTagStart(String text, ContextEntry e) {
-        return e.start() + findContextTag(text.substring(e.start(), e.end()), 0);
-    }
-
-    private static String openingTag(String text, ContextEntry e) {
-        int start = openingTagStart(text, e);
-        return text.substring(start, openTagEnd(text, start));
+    /** Début de la balise dans le texte : le Context, ou le premier Logger / Loader qu'il contient ; -1 sinon. */
+    private static int tagStart(String text, ContextEntry e, String tagName) {
+        String region = text.substring(e.start(), e.end());
+        int context = findContextTag(region, 0);
+        if (tagName.equals("Context")) {
+            return e.start() + context;
+        }
+        Matcher m = Pattern.compile("<" + Pattern.quote(tagName) + "(?=[\\s/>])").matcher(region);
+        int from = openTagEnd(region, context);
+        return m.find(from) ? e.start() + m.start() : -1;
     }
 
     static String rewriteTag(String tag, Map<String, String> newAttributes) {

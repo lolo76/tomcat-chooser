@@ -248,4 +248,22 @@ class ServerXmlTest {
         assertThrows(IllegalArgumentException.class, () -> xml.updateAttributes(xml.contexts().get(0), attrs));
         assertEquals(SERVER_XML, Files.readString(f));
     }
+
+    @Test
+    void modifieLoggerEtLoader() throws Exception {
+        Path f = write(LIGNE_PAR_LIGNE);
+        ServerXml xml = ServerXml.load(f);
+        ContextEntry sireo = xml.contexts().get(0);
+        Map<String, String> logger = xml.attributes(sireo, "Logger");
+        Map<String, String> loader = xml.attributes(sireo, "Loader");
+        assertEquals("4", logger.get("verbosity"));
+        assertEquals("org.apache.catalina.loader.DevLoader", loader.get("className"));
+        assertEquals(null, xml.attributes(xml.contexts().get(1), "Loader"));
+
+        logger.put("verbosity", "2");
+        loader.put("debug", "0");
+        xml.updateTags(sireo, Map.of("Logger", logger, "Loader", loader));
+        assertEquals(LIGNE_PAR_LIGNE.replace("verbosity=\"4\"", "verbosity=\"2\"").replace("debug=\"1\"", "debug=\"0\""),
+                Files.readString(f));
+    }
 }
