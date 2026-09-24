@@ -10,7 +10,7 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 - Au démarrage, le fichier ouvert est `C:\Tomcat70\conf\server.xml`
   (ou le dernier fichier choisi, mémorisé automatiquement).
 - **Parcourir…** permet de choisir un autre `server.xml` ; on peut aussi taper le chemin puis Entrée.
-- Chaque ligne affiche le `path`, le `docBase` et un bouton d'état : **Actif** (vert) ou **Inactif** (gris).
+- Chaque ligne affiche le nom de l'application (le `path` sans le `/`, ou ROOT) et un bouton d'état : **Actif** (vert) ou **Inactif** (gris).
 - Cliquer sur **Actif** commente le Context entier dans un seul bloc `<!-- … -->` ;
   cliquer sur **Inactif** le décommente (y compris un bloc `<!-- … -->` sur plusieurs lignes).
 - La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.

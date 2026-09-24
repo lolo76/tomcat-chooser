@@ -39,6 +39,7 @@ public class TomcatChooserApp extends Application {
     private static final String PREF_LAST_FILE = "lastServerXml";
     private static final double ROW_HEIGHT = 30;
     private static final int MIN_VISIBLE_ROWS = 3;
+    private static final double STATUS_WIDTH = 110;
 
     private final Preferences prefs = Preferences.userNodeForPackage(TomcatChooserApp.class);
     private final TextField pathField = new TextField();
@@ -87,13 +88,8 @@ public class TomcatChooserApp extends Application {
     }
 
     private void buildTable() {
-        TableColumn<ContextEntry, String> path = new TableColumn<>("Path");
-        path.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().displayPath()));
-        path.setPrefWidth(180);
-
-        TableColumn<ContextEntry, String> docBase = new TableColumn<>("DocBase");
-        docBase.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().docBase()));
-        docBase.setPrefWidth(400);
+        TableColumn<ContextEntry, String> application = new TableColumn<>("Application");
+        application.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().displayPath()));
 
         TableColumn<ContextEntry, ContextEntry> action = new TableColumn<>("Statut");
         action.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue()));
@@ -121,15 +117,19 @@ public class TomcatChooserApp extends Application {
                 }
             }
         });
-        action.setPrefWidth(110);
         action.setSortable(false);
 
-        table.getColumns().add(path);
-        table.getColumns().add(docBase);
+        // Colonnes redimensionnables à la souris, sans barre de défilement horizontale.
+        action.setPrefWidth(STATUS_WIDTH);
+        action.setMinWidth(80);
+        application.setMinWidth(80);
+        application.setPrefWidth(340);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_SUBSEQUENT_COLUMNS);
+
+        table.getColumns().add(application);
         table.getColumns().add(action);
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setFixedCellSize(ROW_HEIGHT);
-        table.setPrefWidth(760);
+        table.setPrefWidth(460);
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
     }
 

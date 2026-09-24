@@ -70,8 +70,9 @@ public final class ContextEntry {
         return rawText;
     }
 
-    /** Nom affiché : le path, ou "/ (ROOT)" pour le contexte racine. */
+    /** Nom affiché : le path sans le "/" initial, ou "ROOT" pour le contexte racine. */
     public String displayPath() {
-        return path.isEmpty() || path.equals("/") ? "/ (ROOT)" : path;
+        String name = path.startsWith("/") ? path.substring(1) : path;
+        return name.isEmpty() ? "ROOT" : name;
     }
 }

@@ -60,7 +60,8 @@ class ServerXmlTest {
         assertTrue(c.get(2).commented());
         assertEquals("", c.get(3).path());
         assertEquals("C:/apps/root", c.get(3).docBase());
-        assertEquals("/ (ROOT)", c.get(3).displayPath());
+        assertEquals("ROOT", c.get(3).displayPath());
+        assertEquals("appli1", c.get(0).displayPath());
         assertFalse(c.get(3).commented());
         assertEquals(7, c.get(0).line());
     }
