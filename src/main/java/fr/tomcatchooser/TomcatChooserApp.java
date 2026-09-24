@@ -4,12 +4,17 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
+import java.util.Optional;
 import java.util.prefs.Preferences;
 
 import javafx.application.Application;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
@@ -18,16 +23,20 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -45,6 +54,9 @@ public class TomcatChooserApp extends Application {
     private final TextField pathField = new TextField();
     private final TableView<ContextEntry> table = new TableView<>();
     private final Label status = new Label();
+    private final TextField search = new TextField();
+    private final ObservableList<ContextEntry> contexts = FXCollections.observableArrayList();
+    private final FilteredList<ContextEntry> filtered = new FilteredList<>(contexts);
     private Stage stage;
     private ServerXml serverXml;
 
@@ -66,12 +78,22 @@ public class TomcatChooserApp extends Application {
         top.setAlignment(Pos.CENTER_LEFT);
         top.setPadding(new Insets(10));
 
+        search.setPromptText("Rechercher une application…");
+        search.textProperty().addListener((obs, old, text) -> {
+            String q = text.trim().toLowerCase();
+            filtered.setPredicate(c -> q.isEmpty() || c.displayPath().toLowerCase().contains(q));
+        });
+        HBox.setHgrow(search, Priority.ALWAYS);
+        HBox searchBar = new HBox(8, new Label("Rechercher :"), search);
+        searchBar.setAlignment(Pos.CENTER_LEFT);
+        searchBar.setPadding(new Insets(0, 10, 8, 10));
+
         buildTable();
 
         status.setPadding(new Insets(6, 10, 8, 10));
         status.setWrapText(true);
 
-        BorderPane root = new BorderPane(table, top, null, status, null);
+        BorderPane root = new BorderPane(table, new VBox(top, searchBar), null, status, null);
         BorderPane.setMargin(table, new Insets(0, 10, 0, 10));
 
         stage.setTitle("Tomcat Chooser");
@@ -126,11 +148,33 @@ public class TomcatChooserApp extends Application {
         application.setPrefWidth(340);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_SUBSEQUENT_COLUMNS);
 
+        SortedList<ContextEntry> sorted = new SortedList<>(filtered);
+        sorted.comparatorProperty().bind(table.comparatorProperty());
+        table.setItems(sorted);
+        table.setRowFactory(tv -> {
+            TableRow<ContextEntry> row = new TableRow<>();
+            row.setOnMouseClicked(e -> {
+                if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2 && !row.isEmpty()
+                        && !isInsideButton(e.getTarget())) {
+                    edit(row.getItem());
+                }
+            });
+            return row;
+        });
         table.getColumns().add(application);
         table.getColumns().add(action);
         table.setFixedCellSize(ROW_HEIGHT);
         table.setPrefWidth(460);
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
+    }
+
+    private static boolean isInsideButton(Object target) {
+        for (Node n = target instanceof Node node ? node : null; n != null; n = n.getParent()) {
+            if (n instanceof ButtonBase) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void chooseFile() {
@@ -156,7 +200,7 @@ public class TomcatChooserApp extends Application {
         pathField.setText(file.toString());
         if (!Files.isRegularFile(file)) {
             serverXml = null;
-            table.setItems(FXCollections.observableArrayList());
+            contexts.clear();
             setStatus("Fichier introuvable : " + file + ". Cliquez sur « Parcourir… » pour choisir un server.xml.", true);
             return;
         }
@@ -168,7 +212,7 @@ public class TomcatChooserApp extends Application {
             setStatus(serverXml.contexts().size() + " Context trouvé(s), dont " + active + " actif(s).", false);
         } catch (Exception ex) {
             serverXml = null;
-            table.setItems(FXCollections.observableArrayList());
+            contexts.clear();
             setStatus("Impossible de lire " + file + " : " + ex.getMessage(), true);
         }
     }
@@ -180,26 +224,54 @@ public class TomcatChooserApp extends Application {
         try {
             ContextEntry updated = serverXml.toggle(entry);
             refresh();
-            table.getSelectionModel().select(updated.index());
+            select(updated);
             setStatus("Context " + updated.displayPath() + (updated.commented() ? " désactivé (commenté)" : " activé (décommenté)")
                     + ". Redémarrez Tomcat pour appliquer.", false);
         } catch (Exception ex) {
-            try {
-                serverXml.reload();
-                refresh();
-            } catch (Exception ignored) {
-                // l'erreur principale est affichée ci-dessous
-            }
-            setStatus(ex.getMessage(), true);
-            Alert alert = new Alert(Alert.AlertType.ERROR, ex.getMessage());
-            alert.setHeaderText("Modification impossible");
-            alert.initOwner(stage);
-            alert.showAndWait();
+            showError(ex);
         }
     }
 
+    private void showError(Exception ex) {
+        try {
+            serverXml.reload();
+            refresh();
+        } catch (Exception ignored) {
+            // l'erreur principale est affichée ci-dessous
+        }
+        setStatus(ex.getMessage(), true);
+        Alert alert = new Alert(Alert.AlertType.ERROR, ex.getMessage());
+        alert.setHeaderText("Modification impossible");
+        alert.initOwner(stage);
+        alert.showAndWait();
+    }
+
+    private void edit(ContextEntry entry) {
+        if (serverXml == null || entry == null) {
+            return;
+        }
+        Optional<Map<String, String>> result =
+                new ContextEditorDialog(stage, entry, serverXml.attributes(entry)).showAndWait();
+        if (result.isEmpty() || result.get().equals(serverXml.attributes(entry))) {
+            return;
+        }
+        try {
+            ContextEntry updated = serverXml.updateAttributes(entry, result.get());
+            refresh();
+            select(updated);
+            setStatus("Context " + updated.displayPath() + " modifié. Redémarrez Tomcat pour appliquer.", false);
+        } catch (Exception ex) {
+            showError(ex);
+        }
+    }
+
+    private void select(ContextEntry entry) {
+        table.getItems().stream().filter(c -> c.index() == entry.index()).findFirst()
+                .ifPresent(c -> table.getSelectionModel().select(c));
+    }
+
     private void refresh() {
-        table.setItems(FXCollections.observableArrayList(serverXml.contexts()));
+        contexts.setAll(serverXml.contexts());
         table.refresh();
         fitWindowToRows();
     }
@@ -210,7 +282,7 @@ public class TomcatChooserApp extends Application {
         table.layout();
         Node header = table.lookup(".column-header-background");
         double headerHeight = header == null ? 25 : header.prefHeight(-1);
-        int rows = Math.max(MIN_VISIBLE_ROWS, table.getItems().size());
+        int rows = Math.max(MIN_VISIBLE_ROWS, contexts.size());
         double tableHeight = headerHeight + rows * ROW_HEIGHT + 4;
 
         Rectangle2D screen = Screen.getScreensForRectangle(stage.getX(), stage.getY(), 1, 1).stream()

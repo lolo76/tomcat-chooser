@@ -14,6 +14,10 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 - Cliquer sur **Actif** commente le Context entier dans un seul bloc `<!-- … -->` ;
   cliquer sur **Inactif** le décommente (y compris un bloc `<!-- … -->` sur plusieurs lignes).
 - La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.
+- Le champ **Rechercher** filtre la liste sur le nom de l'application.
+- Un **double-clic** sur une ligne ouvre une fenêtre pour modifier les attributs du Context
+  (path, docBase, reloadable, workDir…) : modifier une valeur, supprimer (✕) ou ajouter un attribut.
+  Cela fonctionne aussi pour un Context inactif (commenté).
 - Seule la zone du Context change : indentation, autres commentaires, fins de ligne et encodage
   du fichier sont conservés.
 - À la première modification, `server.xml.orig` est créé (copie du fichier d'origine, jamais écrasée).

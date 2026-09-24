@@ -8,7 +8,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,6 +31,9 @@ public final class ServerXml {
 
     private static final Pattern ENCODING_DECL =
             Pattern.compile("<\\?xml[^>]*encoding\\s*=\\s*[\"']([A-Za-z0-9._-]+)[\"']");
+    /** Attribut dans une balise : groupe 1 = nom, 2 = valeur avec guillemets, 3 ou 4 = valeur. */
+    private static final Pattern ATTRIBUTE =
+            Pattern.compile("\\s([A-Za-z_:][A-Za-z0-9_:.-]*)\\s*=\\s*(\"([^\"]*)\"|'([^']*)')");
     private static final Pattern CLOSING_CONTEXT = Pattern.compile("</Context\\s*>");
     private static final Pattern COMMENT = Pattern.compile("<!--(.*?)-->", Pattern.DOTALL);
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
@@ -78,6 +83,47 @@ public final class ServerXml {
      * @return le Context dans son nouvel état
      */
     public ContextEntry toggle(ContextEntry entry) throws IOException {
+        ContextEntry current = reloadAndCheck(entry);
+        String newText = current.commented() ? uncomment(text, current) : comment(text, current);
+        validateXml(newText);
+        save(newText);
+        return contexts.get(entry.index());
+    }
+
+    /** Attributs de la balise {@code <Context>}, dans l'ordre du fichier (valeurs décodées). */
+    public Map<String, String> attributes(ContextEntry entry) {
+        Map<String, String> result = new LinkedHashMap<>();
+        Matcher m = ATTRIBUTE.matcher(openingTag(text, entry));
+        while (m.find()) {
+            result.put(m.group(1), unescape(m.group(3) != null ? m.group(3) : m.group(4)));
+        }
+        return result;
+    }
+
+    /**
+     * Remplace les attributs de la balise {@code <Context>} (actif ou commenté), puis enregistre.
+     * Les attributs inchangés gardent leur texte exact ; les nouveaux sont ajoutés à la fin de la balise.
+     *
+     * @return le Context mis à jour
+     */
+    public ContextEntry updateAttributes(ContextEntry entry, Map<String, String> newAttributes) throws IOException {
+        for (String name : newAttributes.keySet()) {
+            if (!name.matches("[A-Za-z_:][A-Za-z0-9_:.-]*")) {
+                throw new IllegalArgumentException("Nom d'attribut invalide : \"" + name + "\"");
+            }
+        }
+        ContextEntry current = reloadAndCheck(entry);
+        int tagStart = openingTagStart(text, current);
+        String tag = openingTag(text, current);
+        String newTag = rewriteTag(tag, newAttributes);
+        String newText = text.substring(0, tagStart) + newTag + text.substring(tagStart + tag.length());
+        validateXml(newText);
+        save(newText);
+        return contexts.get(entry.index());
+    }
+
+    /** Relit le fichier et vérifie que le Context n'a pas changé depuis l'affichage. */
+    private ContextEntry reloadAndCheck(ContextEntry entry) throws IOException {
         // Le fichier a pu être modifié à la main entre-temps : on relit et on vérifie.
         reload();
         if (entry.index() >= contexts.size()
@@ -85,14 +131,63 @@ public final class ServerXml {
             throw new IOException("Le fichier a été modifié en dehors de l'application. "
                     + "La liste vient d'être rechargée, réessayez.");
         }
-        ContextEntry current = contexts.get(entry.index());
-        String newText = current.commented() ? uncomment(text, current) : comment(text, current);
-        validateXml(newText);
-        save(newText);
         return contexts.get(entry.index());
     }
 
     // ---------------------------------------------------------------- édition
+
+    private static int openingTagStart(String text, ContextEntry e) {
+        return e.start() + findContextTag(text.substring(e.start(), e.end()), 0);
+    }
+
+    private static String openingTag(String text, ContextEntry e) {
+        int start = openingTagStart(text, e);
+        return text.substring(start, openTagEnd(text, start));
+    }
+
+    static String rewriteTag(String tag, Map<String, String> newAttributes) {
+        Map<String, String> remaining = new LinkedHashMap<>(newAttributes);
+        StringBuilder out = new StringBuilder();
+        Matcher m = ATTRIBUTE.matcher(tag);
+        int last = 0;
+        while (m.find()) {
+            String name = m.group(1);
+            String oldValue = unescape(m.group(3) != null ? m.group(3) : m.group(4));
+            out.append(tag, last, m.start());
+            if (!remaining.containsKey(name)) {
+                // attribut supprimé : on retire aussi l'espace qui le précède
+            } else if (remaining.get(name).equals(oldValue)) {
+                out.append(m.group());
+            } else {
+                String quote = m.group(3) != null ? "\"" : "'";
+                out.append(m.group(), 0, m.start(2) - m.start())
+                        .append(quote).append(escape(remaining.get(name), quote)).append(quote);
+            }
+            remaining.remove(name);
+            last = m.end();
+        }
+        String rest = tag.substring(last);
+        // rest = fin de balise : blancs éventuels puis ">" ou "/>" ; les nouveaux attributs vont avant.
+        int insert = rest.endsWith("/>") ? rest.length() - 2 : rest.length() - 1;
+        while (insert > 0 && Character.isWhitespace(rest.charAt(insert - 1))) {
+            insert--;
+        }
+        out.append(rest, 0, insert);
+        remaining.forEach((name, value) ->
+                out.append(' ').append(name).append("=\"").append(escape(value, "\"")).append('"'));
+        out.append(rest.substring(insert));
+        return out.toString();
+    }
+
+    private static String escape(String value, String quote) {
+        String v = value.replace("&", "&amp;").replace("<", "&lt;");
+        return quote.equals("\"") ? v.replace("\"", "&quot;") : v.replace("'", "&apos;");
+    }
+
+    private static String unescape(String value) {
+        return value.replace("&quot;", "\"").replace("&apos;", "'").replace("&lt;", "<")
+                .replace("&gt;", ">").replace("&amp;", "&");
+    }
 
     static String comment(String text, ContextEntry e) {
         String element = text.substring(e.start(), e.end());

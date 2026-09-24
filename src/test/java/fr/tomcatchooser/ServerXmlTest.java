@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -194,5 +195,57 @@ class ServerXmlTest {
         assertTrue(recommented.contains("<!-- <Context path=\"/Sireo_CG44\""), recommented);
         assertTrue(recommented.contains("useSystemClassLoaderAsParent=\"false\" />\r\n</Context> -->"), recommented);
         assertTrue(ServerXml.load(f).contexts().get(0).commented());
+    }
+
+    @Test
+    void litLesAttributsDuContext() throws Exception {
+        ServerXml xml = ServerXml.load(write(SERVER_XML));
+        Map<String, String> attrs = xml.attributes(xml.contexts().get(0));
+        assertEquals(List.of("path", "docBase", "reloadable"), List.copyOf(attrs.keySet()));
+        assertEquals("C:/apps/appli1", attrs.get("docBase"));
+        // Context commenté sur plusieurs lignes
+        assertEquals("C:/apps/appli3", xml.attributes(xml.contexts().get(2)).get("docBase"));
+    }
+
+    @Test
+    void modifieSupprimeEtAjouteDesAttributs() throws Exception {
+        Path f = write(SERVER_XML);
+        ServerXml xml = ServerXml.load(f);
+        Map<String, String> attrs = xml.attributes(xml.contexts().get(0));
+        attrs.put("docBase", "D:/nouveau & <test>");
+        attrs.remove("reloadable");
+        attrs.put("workDir", "D:/work");
+        xml.updateAttributes(xml.contexts().get(0), attrs);
+        assertTrue(Files.readString(f).contains(
+                "    <Context path=\"/appli1\" docBase=\"D:/nouveau &amp; &lt;test>\" workDir=\"D:/work\"/>\r\n"),
+                Files.readString(f));
+        ServerXml reloaded = ServerXml.load(f);
+        assertEquals("D:/nouveau & <test>", reloaded.attributes(reloaded.contexts().get(0)).get("docBase"));
+        // le reste du fichier est intact
+        assertEquals(SERVER_XML.replace(" docBase=\"C:/apps/appli1\" reloadable=\"true\"/>",
+                " docBase=\"D:/nouveau &amp; &lt;test>\" workDir=\"D:/work\"/>"), Files.readString(f));
+    }
+
+    @Test
+    void modifieUnContextCommenteLigneParLigne() throws Exception {
+        Path f = write(LIGNE_PAR_LIGNE);
+        ServerXml xml = ServerXml.load(f);
+        Map<String, String> attrs = xml.attributes(xml.contexts().get(0));
+        assertEquals("false", attrs.get("reloadable"));
+        attrs.put("reloadable", "true");
+        xml.updateAttributes(xml.contexts().get(0), attrs);
+        String result = Files.readString(f);
+        assertEquals(LIGNE_PAR_LIGNE.replace("reloadable=\"false\" docBase", "reloadable=\"true\" docBase"), result);
+        assertTrue(ServerXml.load(f).contexts().get(0).commented());
+    }
+
+    @Test
+    void refuseUnNomDAttributInvalide() throws Exception {
+        Path f = write(SERVER_XML);
+        ServerXml xml = ServerXml.load(f);
+        Map<String, String> attrs = xml.attributes(xml.contexts().get(0));
+        attrs.put("mauvais nom", "x");
+        assertThrows(IllegalArgumentException.class, () -> xml.updateAttributes(xml.contexts().get(0), attrs));
+        assertEquals(SERVER_XML, Files.readString(f));
     }
 }
