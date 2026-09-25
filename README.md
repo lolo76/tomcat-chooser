@@ -10,17 +10,19 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 - Au démarrage, le fichier ouvert est `C:\Tomcat70\conf\server.xml`
   (ou le dernier fichier choisi, mémorisé automatiquement).
 - **Parcourir…** permet de choisir un autre `server.xml` ; on peut aussi taper le chemin puis Entrée.
+- À droite du chemin, le bouton ↻ recharge le fichier et le bouton crayon ouvre `server.xml`
+  dans l'éditeur du système (Bloc-notes à défaut) ; rechargez après l'avoir enregistré.
 - Chaque ligne affiche le nom de l'application (le `path` sans le `/`, ou ROOT) et un bouton d'état : **Actif** (vert) ou **Inactif** (gris).
 - Cliquer sur **Actif** commente le Context entier dans un seul bloc `<!-- … -->` ;
   cliquer sur **Inactif** le décommente (y compris un bloc `<!-- … -->` sur plusieurs lignes).
 - La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.
-- Le champ **Rechercher** filtre la liste sur le nom de l'application.
+- Le champ de recherche filtre la liste sur le nom de l'application.
 - En bas à droite, un voyant indique si **Tomcat est démarré ou arrêté** (vérifié toutes les 3 s).
   Il teste sur localhost le port d'arrêt (`<Server port=…>`) et le port HTTP du `server.xml` choisi,
   quel que soit le lanceur (Eclipse, startup.bat, service).
 - Un **double-clic** sur une ligne ouvre une fenêtre pour modifier les attributs du Context
-  (path, docBase, reloadable, workDir…) et ceux de ses éléments `<Logger>` et `<Loader>` :
-  modifier une valeur, supprimer (✕) ou ajouter un attribut. Les valeurs true/false sont des boutons.
+  (path, docBase, reloadable, workDir…) et ceux de son élément `<Loader>` :
+  modifier une valeur ou supprimer (✕) un attribut. Les valeurs true/false sont des boutons.
   Cela fonctionne aussi pour un Context inactif (commenté).
 - Seule la zone du Context change : indentation, autres commentaires, fins de ligne et encodage
   du fichier sont conservés.

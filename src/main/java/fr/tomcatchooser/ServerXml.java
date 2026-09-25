@@ -92,8 +92,8 @@ public final class ServerXml {
         return contexts.get(entry.index());
     }
 
-    /** Balises modifiables : le Context lui-même et ses éléments enfants Logger et Loader. */
-    public static final List<String> EDITABLE_TAGS = List.of("Context", "Logger", "Loader");
+    /** Balises modifiables : le Context lui-même et son élément enfant Loader. */
+    public static final List<String> EDITABLE_TAGS = List.of("Context", "Loader");
 
     /** Attributs de la balise {@code <Context>}, dans l'ordre du fichier (valeurs décodées). */
     public Map<String, String> attributes(ContextEntry entry) {

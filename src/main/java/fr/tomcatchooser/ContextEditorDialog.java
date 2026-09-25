@@ -22,7 +22,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 /**
- * Fenêtre de modification d'un {@code <Context>} : ses attributs, et ceux de ses éléments Logger et Loader.
+ * Fenêtre de modification d'un {@code <Context>} : ses attributs, et ceux de son élément Loader.
  * Le résultat associe chaque balise présente à ses nouveaux attributs.
  */
 final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>> {
@@ -52,7 +52,7 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
                 body = editor;
             }
             TitledPane pane = new TitledPane(tag, body);
-            // Seul le Context est déplié ; Logger et Loader s'ouvrent d'un clic.
+            // Seul le Context est déplié ; le Loader s'ouvre d'un clic.
             pane.setExpanded(tag.equals("Context"));
             sections.getChildren().add(pane);
         });
@@ -76,7 +76,7 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
         });
     }
 
-    /** Liste d'attributs modifiable : valeur, suppression (✕) et ajout. true/false s'affichent en bouton. */
+    /** Liste d'attributs modifiable : valeur et suppression (✕). true/false s'affichent en bouton. */
     private static final class AttributeEditor extends VBox {
 
         private final VBox rows = new VBox(6);
@@ -86,31 +86,10 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
             setPadding(new Insets(8));
             attributes.forEach(this::addRow);
 
-            TextField newName = new TextField();
-            newName.setPromptText("nouvel attribut");
-            newName.setPrefWidth(NAME_WIDTH);
-            newName.setMinWidth(NAME_WIDTH);
-            TextField newValue = new TextField();
-            newValue.setPromptText("valeur (true / false pour un bouton)");
-            HBox.setHgrow(newValue, Priority.ALWAYS);
-            Button add = new Button("Ajouter");
-            add.setOnAction(e -> {
-                String name = newName.getText().trim();
-                if (!name.isEmpty()) {
-                    addRow(name, newValue.getText());
-                    newName.clear();
-                    newValue.clear();
-                    newName.requestFocus();
-                }
-            });
-            HBox addRow = new HBox(6, newName, newValue, add);
-            addRow.setAlignment(Pos.CENTER_LEFT);
-            getChildren().addAll(rows, addRow);
+            getChildren().add(rows);
         }
 
         private void addRow(String name, String value) {
-            // Un attribut déjà présent est remplacé plutôt que dupliqué.
-            rows.getChildren().removeIf(node -> ((Label) ((HBox) node).getChildren().get(0)).getText().equals(name));
             Label label = new Label(name);
             label.setPrefWidth(NAME_WIDTH);
             label.setMinWidth(NAME_WIDTH);

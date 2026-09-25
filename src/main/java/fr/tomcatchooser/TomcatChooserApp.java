@@ -1,5 +1,6 @@
 package fr.tomcatchooser;
 
+import java.awt.Desktop;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,6 +61,9 @@ public class TomcatChooserApp extends Application {
     private static final String REFRESH_ICON = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8"
             + "c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6"
             + "c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
+    /** Icône « modifier » (crayon, Material Design). */
+    private static final String EDIT_ICON = "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"
+            + "M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z";
 
     private final Preferences prefs = Preferences.userNodeForPackage(TomcatChooserApp.class);
     private final TextField pathField = new TextField();
@@ -90,10 +94,17 @@ public class TomcatChooserApp extends Application {
         reload.setGraphic(refreshIcon);
         reload.setTooltip(new Tooltip("Recharger le fichier"));
         reload.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
+        Button editFile = new Button();
+        SVGPath editIcon = new SVGPath();
+        editIcon.setContent(EDIT_ICON);
+        editIcon.setStyle("-fx-fill: #1565c0;");
+        editFile.setGraphic(editIcon);
+        editFile.setTooltip(new Tooltip("Ouvrir server.xml dans l'éditeur du système"));
+        editFile.setOnAction(e -> openInSystemEditor(Paths.get(pathField.getText().trim())));
         pathField.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
         HBox.setHgrow(pathField, Priority.ALWAYS);
         pathField.setPromptText("Chemin du server.xml");
-        HBox top = new HBox(8, browse, pathField, reload);
+        HBox top = new HBox(8, browse, pathField, reload, editFile);
         top.setAlignment(Pos.CENTER_LEFT);
         top.setPadding(new Insets(10));
 
@@ -103,19 +114,16 @@ public class TomcatChooserApp extends Application {
             filtered.setPredicate(c -> q.isEmpty() || c.displayPath().toLowerCase().contains(q));
         });
         HBox.setHgrow(search, Priority.ALWAYS);
-        Label searchLabel = new Label("Rechercher :");
-        // Espace de la largeur du bouton Recharger : le champ de recherche a la même largeur que le chemin.
-        Region reloadSpace = new Region();
-        reloadSpace.minWidthProperty().bind(reload.widthProperty());
-        HBox searchBar = new HBox(8, searchLabel, search, reloadSpace);
+        // Espace de la largeur des boutons de droite : le champ de recherche finit au même endroit que le chemin.
+        Region buttonsSpace = new Region();
+        buttonsSpace.minWidthProperty().bind(reload.widthProperty().add(editFile.widthProperty()).add(8));
+        HBox searchBar = new HBox(8, search, buttonsSpace);
         searchBar.setAlignment(Pos.CENTER_LEFT);
         searchBar.setPadding(new Insets(0, 10, 8, 10));
 
         buildTable();
-        // Le libellé a la largeur de la colonne Statut : le champ s'aligne sur la colonne Application.
+        // Parcourir a la largeur de la colonne Statut : le chemin s'aligne sur la colonne Application.
         TableColumn<ContextEntry, ?> statusColumn = table.getColumns().get(0);
-        searchLabel.minWidthProperty().bind(statusColumn.widthProperty().subtract(8));
-        searchLabel.prefWidthProperty().bind(statusColumn.widthProperty().subtract(8));
         browse.minWidthProperty().bind(statusColumn.widthProperty().subtract(8));
         browse.prefWidthProperty().bind(statusColumn.widthProperty().subtract(8));
 
@@ -181,7 +189,7 @@ public class TomcatChooserApp extends Application {
         action.setPrefWidth(STATUS_WIDTH);
         action.setMinWidth(80);
         application.setMinWidth(80);
-        application.setPrefWidth(320);
+        application.setPrefWidth(200);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_SUBSEQUENT_COLUMNS);
 
         SortedList<ContextEntry> sorted = new SortedList<>(filtered);
@@ -200,7 +208,7 @@ public class TomcatChooserApp extends Application {
         table.getColumns().add(action);
         table.getColumns().add(application);
         table.setFixedCellSize(ROW_HEIGHT);
-        table.setPrefWidth(440);
+        table.setPrefWidth(320);
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
     }
 
@@ -230,6 +238,47 @@ public class TomcatChooserApp extends Application {
         if (chosen != null) {
             load(chosen.toPath());
         }
+    }
+
+    /** Ouvre le fichier dans l'éditeur associé par le système (Bloc-notes à défaut). */
+    private void openInSystemEditor(Path file) {
+        if (!Files.isRegularFile(file)) {
+            setStatus("Fichier introuvable : " + file, true);
+            return;
+        }
+        Thread opener = new Thread(() -> {
+            try {
+                openWithDesktop(file.toFile());
+                Platform.runLater(() -> setStatus("server.xml ouvert dans l'éditeur. Cliquez sur Recharger après l'avoir enregistré.", false));
+            } catch (Exception ex) {
+                Platform.runLater(() -> setStatus("Impossible d'ouvrir l'éditeur : " + ex.getMessage(), true));
+            }
+        }, "editeur-systeme");
+        opener.setDaemon(true);
+        opener.start();
+    }
+
+    private static void openWithDesktop(File file) throws Exception {
+        if (Desktop.isDesktopSupported()) {
+            Desktop desktop = Desktop.getDesktop();
+            if (desktop.isSupported(Desktop.Action.EDIT)) {
+                try {
+                    desktop.edit(file);
+                    return;
+                } catch (Exception noEditor) {
+                    // pas d'éditeur associé : on essaie les solutions suivantes
+                }
+            }
+            if (System.getProperty("os.name", "").startsWith("Windows")) {
+                new ProcessBuilder("notepad.exe", file.getAbsolutePath()).start();
+                return;
+            }
+            if (desktop.isSupported(Desktop.Action.OPEN)) {
+                desktop.open(file);
+                return;
+            }
+        }
+        throw new IllegalStateException("aucun éditeur disponible");
     }
 
     private void load(Path file) {
@@ -343,8 +392,6 @@ public class TomcatChooserApp extends Application {
         tomcatState.setStyle(started
                 ? "-fx-text-fill: #2e7d32; -fx-font-weight: bold;"
                 : "-fx-text-fill: #c62828;");
-        tomcatState.setTooltip(new Tooltip("Vérifié toutes les 3 s : port d'arrêt " + status.shutdownPort()
-                + ", port HTTP " + status.httpPort() + " sur localhost."));
     }
 
     private void refresh() {
