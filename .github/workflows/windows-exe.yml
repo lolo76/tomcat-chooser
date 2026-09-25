@@ -25,3 +25,42 @@ jobs:
         with:
           name: TomcatChooser-windows
           path: target/dist/TomcatChooser/
+
+      # Exe portable en un seul fichier : module SFX 7-Zip (7zS2.sfx, extrait dans %TEMP% puis lance
+      # TomcatChooser.exe) + archive 7z du dossier jpackage. L'icône Tomcat est posée sur le module
+      # avant la concaténation, pour ne pas abîmer l'archive ajoutée à la fin.
+      - name: Exe portable (un seul fichier)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build-tools | Out-Null
+          Invoke-WebRequest https://www.7-zip.org/a/lzma2409.7z -OutFile build-tools\lzma.7z
+          7z x build-tools\lzma.7z -obuild-tools\lzma -y | Out-Null
+          $sfx = Get-ChildItem -Recurse build-tools\lzma -Filter 7zS2.sfx | Select-Object -First 1
+          if (-not $sfx) { Get-ChildItem -Recurse build-tools\lzma | Select-Object FullName; throw "7zS2.sfx introuvable" }
+          Copy-Item $sfx.FullName build-tools\stub.exe
+          Invoke-WebRequest https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe -OutFile build-tools\rcedit.exe
+          build-tools\rcedit.exe build-tools\stub.exe --set-icon packaging\tomcat.ico `
+            --set-version-string FileDescription "Tomcat Chooser" --set-version-string ProductName "Tomcat Chooser"
+          Push-Location target\dist\TomcatChooser
+          7z a -mx=7 ..\..\app.7z * | Out-Null
+          Pop-Location
+          New-Item -ItemType Directory -Force target\portable | Out-Null
+          cmd /c copy /b build-tools\stub.exe + target\app.7z target\portable\TomcatChooser.exe
+          Get-Item target\portable\TomcatChooser.exe | Select-Object Name, Length
+
+      - name: Vérifier que l'exe portable démarre
+        shell: pwsh
+        run: |
+          $p = Start-Process target\portable\TomcatChooser.exe -PassThru
+          Start-Sleep -Seconds 25
+          $running = Get-Process | Where-Object { $_.ProcessName -like 'TomcatChooser*' }
+          $running | Select-Object ProcessName, Id, Path | Format-Table -AutoSize
+          if (-not $running) { throw "TomcatChooser ne tourne pas après 25 s" }
+          $running | Stop-Process -Force
+
+      - name: Publier l'exe portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: TomcatChooser-portable
+          path: target/portable/TomcatChooser.exe
