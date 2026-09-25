@@ -209,6 +209,9 @@ public class TomcatChooserApp extends Application {
         table.getColumns().add(application);
         table.setFixedCellSize(ROW_HEIGHT);
         table.setPrefWidth(320);
+        // Pas de ligne de titres au-dessus des colonnes.
+        table.getStylesheets().add("data:text/css,"
+                + ".column-header-background { -fx-pref-height: 0; -fx-min-height: 0; -fx-max-height: 0; visibility: hidden; }");
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
     }
 
@@ -406,7 +409,7 @@ public class TomcatChooserApp extends Application {
         table.applyCss();
         table.layout();
         Node header = table.lookup(".column-header-background");
-        double headerHeight = header == null ? 25 : header.prefHeight(-1);
+        double headerHeight = header == null ? 0 : header.prefHeight(-1);
         int rows = Math.max(MIN_VISIBLE_ROWS, contexts.size());
         double tableHeight = headerHeight + rows * ROW_HEIGHT + 4;
 
