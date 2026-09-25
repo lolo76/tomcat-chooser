@@ -55,8 +55,8 @@ public class TomcatChooserApp extends Application {
     static final Path DEFAULT_SERVER_XML = Paths.get("C:\\Tomcat70\\conf\\server.xml");
     private static final String PREF_LAST_FILE = "lastServerXml";
     private static final double ROW_HEIGHT = 30;
-    private static final int MIN_VISIBLE_ROWS = 3;
     private static final double STATUS_WIDTH = 110;
+    private static final double FOOTER_SPACING = 12;
     /** Icône « recharger » (flèche circulaire, Material Design). */
     private static final String REFRESH_ICON = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8"
             + "c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6"
@@ -79,6 +79,8 @@ public class TomcatChooserApp extends Application {
     private final ObservableList<ContextEntry> contexts = FXCollections.observableArrayList();
     private final FilteredList<ContextEntry> filtered = new FilteredList<>(contexts);
     private Stage stage;
+    private Region header;
+    private Region footer;
     private ServerXml serverXml;
 
     public static void main(String[] args) {
@@ -103,7 +105,7 @@ public class TomcatChooserApp extends Application {
         top.setAlignment(Pos.CENTER_LEFT);
         top.setPadding(new Insets(10, 11, 4, 11));
 
-        search.setPromptText("Rechercher une application…");
+        search.setPromptText("Rechercher");
         search.textProperty().addListener((obs, old, text) -> {
             String q = text.trim().toLowerCase();
             filtered.setPredicate(c -> q.isEmpty() || c.displayPath().toLowerCase().contains(q));
@@ -132,12 +134,17 @@ public class TomcatChooserApp extends Application {
 
         status.setWrapText(true);
         status.setMaxWidth(Double.MAX_VALUE);
+        // Le message ne décide pas de la largeur de la fenêtre : il passe à la ligne.
+        status.setMinWidth(0);
+        status.setPrefWidth(0);
         HBox.setHgrow(status, Priority.ALWAYS);
-        HBox bottom = new HBox(12, status, tomcatState);
+        HBox bottom = new HBox(FOOTER_SPACING, status, tomcatState);
         bottom.setAlignment(Pos.CENTER_LEFT);
         bottom.setPadding(new Insets(6, 10, 8, 10));
 
-        BorderPane root = new BorderPane(table, new VBox(top, searchBar), null, bottom, null);
+        header = new VBox(top, searchBar);
+        footer = bottom;
+        BorderPane root = new BorderPane(table, header, null, bottom, null);
         BorderPane.setMargin(table, new Insets(0, 10, 0, 10));
 
         stage.setTitle("Tomcat Chooser");
@@ -396,6 +403,8 @@ public class TomcatChooserApp extends Application {
 
     /** Vérifie toutes les 3 s si Tomcat tourne (ports de server.xml) et met à jour le voyant. */
     private void startTomcatMonitor() {
+        // Le voyant change de largeur : le message voisin peut changer de nombre de lignes.
+        tomcatState.textProperty().addListener((obs, old, text) -> fitWindowToRows());
         tomcatState.setMinWidth(Region.USE_PREF_SIZE);
         ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "tomcat-status");
@@ -429,25 +438,40 @@ public class TomcatChooserApp extends Application {
         fitWindowToRows();
     }
 
-    /** Agrandit la fenêtre pour afficher toutes les lignes, sans dépasser l'écran. */
+    /** Ajuste la fenêtre pour afficher exactement toutes les lignes, sans dépasser l'écran. */
     private void fitWindowToRows() {
-        table.applyCss();
-        table.layout();
-        Node header = table.lookup(".column-header-background");
-        double headerHeight = header == null ? 0 : header.prefHeight(-1);
-        int rows = Math.max(MIN_VISIBLE_ROWS, contexts.size());
-        double tableHeight = headerHeight + rows * ROW_HEIGHT + 4;
+        if (header == null || stage.getScene() == null) {
+            return;
+        }
+        Parent root = stage.getScene().getRoot();
+        root.applyCss();
+        Node columnHeader = table.lookup(".column-header-background");
+        double headerHeight = columnHeader == null ? 0 : columnHeader.prefHeight(-1);
+        double borders = table.getInsets().getTop() + table.getInsets().getBottom();
+        int rows = Math.max(1, contexts.size());
+        double tableHeight = headerHeight + rows * ROW_HEIGHT + borders;
+
+        // Hauteurs du haut et du bas calculées à la largeur réelle : le message du bas peut
+        // tenir sur plusieurs lignes, ce que la taille « préférée » par défaut ignore.
+        double width = root.prefWidth(-1);
+        Insets pad = footer.getInsets();
+        double statusWidth = width - pad.getLeft() - pad.getRight() - tomcatState.prefWidth(-1) - FOOTER_SPACING;
+        double footerHeight = pad.getTop() + pad.getBottom()
+                + Math.max(status.prefHeight(statusWidth), tomcatState.prefHeight(-1));
+        double others = header.prefHeight(width) + footerHeight;
 
         Rectangle2D screen = Screen.getScreensForRectangle(stage.getX(), stage.getY(), 1, 1).stream()
                 .findFirst().orElse(Screen.getPrimary()).getVisualBounds();
-        Parent root = stage.getScene().getRoot();
-        table.setPrefHeight(tableHeight);
-        double others = root.prefHeight(-1) - tableHeight;
         double decorations = Math.max(0, stage.getHeight() - stage.getScene().getHeight());
         double available = screen.getHeight() - decorations - others;
         if (tableHeight > available) {
-            table.setPrefHeight(Math.max(headerHeight + ROW_HEIGHT, available));
+            // Trop de lignes pour l'écran : un nombre entier de lignes, et une barre de défilement.
+            int visible = (int) Math.max(1, Math.floor((available - headerHeight - borders) / ROW_HEIGHT));
+            tableHeight = headerHeight + visible * ROW_HEIGHT + borders;
         }
+        table.setPrefHeight(tableHeight);
+        table.setMinHeight(tableHeight);
+        ((Region) root).setPrefHeight(others + tableHeight);
         stage.sizeToScene();
         if (stage.getWidth() > screen.getWidth()) {
             stage.setWidth(screen.getWidth());
@@ -464,5 +488,7 @@ public class TomcatChooserApp extends Application {
     private void setStatus(String message, boolean error) {
         status.setText(message);
         status.setStyle(error ? "-fx-text-fill: #c62828;" : "");
+        // Un message plus long peut prendre une ligne de plus : la fenêtre suit.
+        fitWindowToRows();
     }
 }
