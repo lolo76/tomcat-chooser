@@ -43,6 +43,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.SVGPath;
 import javafx.stage.FileChooser;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -55,6 +56,10 @@ public class TomcatChooserApp extends Application {
     private static final double ROW_HEIGHT = 30;
     private static final int MIN_VISIBLE_ROWS = 3;
     private static final double STATUS_WIDTH = 110;
+    /** Icône « recharger » (flèche circulaire, Material Design). */
+    private static final String REFRESH_ICON = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8"
+            + "c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6"
+            + "c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
 
     private final Preferences prefs = Preferences.userNodeForPackage(TomcatChooserApp.class);
     private final TextField pathField = new TextField();
@@ -78,11 +83,17 @@ public class TomcatChooserApp extends Application {
 
         Button browse = new Button("Parcourir…");
         browse.setOnAction(e -> chooseFile());
-        Button reload = new Button("Recharger");
+        Button reload = new Button();
+        SVGPath refreshIcon = new SVGPath();
+        refreshIcon.setContent(REFRESH_ICON);
+        refreshIcon.setStyle("-fx-fill: #2e7d32;");
+        reload.setGraphic(refreshIcon);
+        reload.setTooltip(new Tooltip("Recharger le fichier"));
         reload.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
         pathField.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
         HBox.setHgrow(pathField, Priority.ALWAYS);
-        HBox top = new HBox(8, new Label("server.xml :"), pathField, browse, reload);
+        pathField.setPromptText("Chemin du server.xml");
+        HBox top = new HBox(8, browse, pathField, reload);
         top.setAlignment(Pos.CENTER_LEFT);
         top.setPadding(new Insets(10));
 
@@ -93,7 +104,10 @@ public class TomcatChooserApp extends Application {
         });
         HBox.setHgrow(search, Priority.ALWAYS);
         Label searchLabel = new Label("Rechercher :");
-        HBox searchBar = new HBox(8, searchLabel, search);
+        // Espace de la largeur du bouton Recharger : le champ de recherche a la même largeur que le chemin.
+        Region reloadSpace = new Region();
+        reloadSpace.minWidthProperty().bind(reload.widthProperty());
+        HBox searchBar = new HBox(8, searchLabel, search, reloadSpace);
         searchBar.setAlignment(Pos.CENTER_LEFT);
         searchBar.setPadding(new Insets(0, 10, 8, 10));
 
@@ -102,6 +116,8 @@ public class TomcatChooserApp extends Application {
         TableColumn<ContextEntry, ?> statusColumn = table.getColumns().get(0);
         searchLabel.minWidthProperty().bind(statusColumn.widthProperty().subtract(8));
         searchLabel.prefWidthProperty().bind(statusColumn.widthProperty().subtract(8));
+        browse.minWidthProperty().bind(statusColumn.widthProperty().subtract(8));
+        browse.prefWidthProperty().bind(statusColumn.widthProperty().subtract(8));
 
         status.setWrapText(true);
         status.setMaxWidth(Double.MAX_VALUE);
@@ -165,7 +181,7 @@ public class TomcatChooserApp extends Application {
         action.setPrefWidth(STATUS_WIDTH);
         action.setMinWidth(80);
         application.setMinWidth(80);
-        application.setPrefWidth(340);
+        application.setPrefWidth(320);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_SUBSEQUENT_COLUMNS);
 
         SortedList<ContextEntry> sorted = new SortedList<>(filtered);
@@ -184,7 +200,7 @@ public class TomcatChooserApp extends Application {
         table.getColumns().add(action);
         table.getColumns().add(application);
         table.setFixedCellSize(ROW_HEIGHT);
-        table.setPrefWidth(560);
+        table.setPrefWidth(440);
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
     }
 
