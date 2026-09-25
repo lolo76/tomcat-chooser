@@ -119,6 +119,8 @@ public class TomcatChooserApp extends Application {
                     TomcatChooserApp.class.getResourceAsStream("tomcat-" + size + ".png")));
         }
         stage.setScene(new Scene(root));
+        // Taille fixe : la fenêtre s'ajuste seule au nombre de Context (voir fitWindowToRows).
+        stage.setResizable(false);
         stage.show();
 
         String param = getParameters().getRaw().isEmpty() ? null : getParameters().getRaw().get(0);
