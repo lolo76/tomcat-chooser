@@ -18,7 +18,7 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 - La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.
 - Le champ de recherche filtre la liste sur le nom de l'application.
 - En bas à droite, un voyant indique si **Tomcat est démarré ou arrêté** (vérifié toutes les 3 s).
-  Il teste sur localhost le port d'arrêt (`<Server port=…>`) et le port HTTP du `server.xml` choisi,
+  Il teste sur localhost le port HTTP du `server.xml` choisi (jamais le port d'arrêt),
   quel que soit le lanceur (Eclipse, startup.bat, service).
 - Un **double-clic** sur une ligne ouvre une fenêtre pour modifier les attributs du Context
   (path, docBase, reloadable, workDir…) et ceux de son élément `<Loader>` :

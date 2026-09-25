@@ -8,7 +8,8 @@ import java.util.regex.Pattern;
 
 /**
  * État de Tomcat, déduit des ports déclarés dans server.xml : Tomcat est considéré démarré quand
- * son port d'arrêt ({@code <Server port=...>}) ou son connecteur HTTP écoute sur localhost.
+ * son connecteur HTTP écoute sur localhost. Le port d'arrêt ({@code <Server port=...>}) n'est jamais
+ * testé : chaque connexion y fait écrire à Tomcat « Une commande d'arrêt invalide a été reçue ».
  * Cela marche quel que soit le lanceur (Eclipse, startup.bat, service), tant qu'il utilise ce server.xml.
  */
 public final class TomcatStatus {
@@ -58,7 +59,7 @@ public final class TomcatStatus {
 
     /** Teste les ports (bloquant, quelques centaines de ms au plus) : à appeler hors du thread JavaFX. */
     public State check() {
-        return isListening(shutdownPort) || isListening(httpPort) ? State.STARTED : State.STOPPED;
+        return isListening(httpPort) ? State.STARTED : State.STOPPED;
     }
 
     static boolean isListening(int port) {

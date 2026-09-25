@@ -24,16 +24,17 @@ class TomcatStatusTest {
     }
 
     @Test
-    void demarreQuandUnPortEcoute() throws Exception {
+    void demarreQuandLePortHttpEcoute() throws Exception {
         try (ServerSocket fake = new ServerSocket(0)) {
             int port = fake.getLocalPort();
-            assertEquals(TomcatStatus.State.STARTED, new TomcatStatus(port, -1).check());
             assertEquals(TomcatStatus.State.STARTED, new TomcatStatus(-1, port).check());
+            // Le port d'arrêt n'est jamais testé.
+            assertEquals(TomcatStatus.State.STOPPED, new TomcatStatus(port, -1).check());
         }
         int free;
         try (ServerSocket s = new ServerSocket(0)) {
             free = s.getLocalPort();
         }
-        assertEquals(TomcatStatus.State.STOPPED, new TomcatStatus(free, -1).check());
+        assertEquals(TomcatStatus.State.STOPPED, new TomcatStatus(-1, free).check());
     }
 }
