@@ -11,8 +11,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>21</maven.compiler.release>
-        <javafx.version>21.0.5</javafx.version>
+        <maven.compiler.release>27</maven.compiler.release>
+        <javafx.version>27</javafx.version>
         <junit.version>5.10.2</junit.version>
         <mainClass>fr.tomcatchooser/fr.tomcatchooser.TomcatChooserApp</mainClass>
     </properties>
@@ -85,7 +85,6 @@
                     <noHeaderFiles>true</noHeaderFiles>
                     <noManPages>true</noManPages>
                     <stripDebug>true</stripDebug>
-                    <compress>2</compress>
                 </configuration>
             </plugin>
             <!-- Exe Windows : mvn clean package javafx:jlink exec:exec@jpackage -->
