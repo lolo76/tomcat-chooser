@@ -18,6 +18,7 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.stage.Window;
 
 /**
@@ -26,7 +27,6 @@ import javafx.stage.Window;
  */
 final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>> {
 
-    private static final double NAME_WIDTH = 215;
 
     private final Map<String, AttributeEditor> editors = new LinkedHashMap<>();
 
@@ -46,7 +46,7 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
                 none.setStyle("-fx-text-fill: #888888;");
                 body = none;
             } else {
-                AttributeEditor editor = new AttributeEditor(attributes);
+                AttributeEditor editor = new AttributeEditor(attributes, nameWidth(attributes));
                 editors.put(tag, editor);
                 body = editor;
             }
@@ -57,7 +57,7 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
         ScrollPane scroll = new ScrollPane(sections);
         scroll.setFitToWidth(true);
         scroll.setPrefViewportHeight(330);
-        scroll.setPrefViewportWidth(680);
+        scroll.setPrefViewportWidth(820);
         getDialogPane().setContent(scroll);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         ((Button) getDialogPane().lookupButton(ButtonType.OK)).setText("Enregistrer");
@@ -73,13 +73,22 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
         });
     }
 
+    /** Colonne des noms juste assez large pour le plus long de la section : les champs commencent au plus à gauche. */
+    private static double nameWidth(Map<String, String> attributes) {
+        return attributes.keySet().stream()
+                .mapToDouble(name -> new Text(name).getLayoutBounds().getWidth()).max().orElse(60) + 16;
+    }
+
     /** Liste d'attributs modifiable : valeur et suppression (✕). true/false s'affichent en bouton. */
     private static final class AttributeEditor extends VBox {
 
         private final VBox rows = new VBox(6);
 
-        AttributeEditor(Map<String, String> attributes) {
+        private final double nameWidth;
+
+        AttributeEditor(Map<String, String> attributes, double nameWidth) {
             super(10);
+            this.nameWidth = nameWidth;
             setPadding(new Insets(8));
             attributes.forEach(this::addRow);
 
@@ -88,8 +97,8 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
 
         private void addRow(String name, String value) {
             Label label = new Label(name);
-            label.setPrefWidth(NAME_WIDTH);
-            label.setMinWidth(NAME_WIDTH);
+            label.setPrefWidth(nameWidth);
+            label.setMinWidth(nameWidth);
             Control field = isBoolean(value) ? booleanButton(value) : new TextField(value);
             if (field instanceof TextField) {
                 HBox.setHgrow(field, Priority.ALWAYS);

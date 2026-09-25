@@ -96,11 +96,12 @@ public class TomcatChooserApp extends Application {
         Button editFile = iconButton(EDIT_ICON);
         editFile.setOnAction(e -> openInSystemEditor(Paths.get(pathField.getText().trim())));
         pathField.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
-        HBox.setHgrow(pathField, Priority.ALWAYS);
         pathField.setPromptText("Chemin du server.xml");
-        HBox top = new HBox(6, pathField, browse, reload, editFile);
+        HBox icons = new HBox(4, browse, reload, editFile);
+        icons.setAlignment(Pos.CENTER_LEFT);
+        HBox top = new HBox(0, icons, pathField);
         top.setAlignment(Pos.CENTER_LEFT);
-        top.setPadding(new Insets(10, 10, 8, 10));
+        top.setPadding(new Insets(10, 11, 4, 11));
 
         search.setPromptText("Rechercher une application…");
         search.textProperty().addListener((obs, old, text) -> {
@@ -118,10 +119,16 @@ public class TomcatChooserApp extends Application {
         search.minWidthProperty().bind(applicationColumn.widthProperty());
         search.prefWidthProperty().bind(applicationColumn.widthProperty());
         search.maxWidthProperty().bind(applicationColumn.widthProperty());
+        // Les icônes occupent la largeur de la colonne Statut : le chemin s'aligne sur la recherche.
+        icons.minWidthProperty().bind(statusColumn.widthProperty());
+        icons.prefWidthProperty().bind(statusColumn.widthProperty());
+        pathField.minWidthProperty().bind(applicationColumn.widthProperty());
+        pathField.prefWidthProperty().bind(applicationColumn.widthProperty());
+        pathField.maxWidthProperty().bind(applicationColumn.widthProperty());
         HBox searchBar = new HBox(0, statusSpace, search);
         searchBar.setAlignment(Pos.CENTER_LEFT);
         // 1 px : bordure du tableau.
-        searchBar.setPadding(new Insets(0, 11, 4, 11));
+        searchBar.setPadding(new Insets(0, 11, 8, 11));
 
         status.setWrapText(true);
         status.setMaxWidth(Double.MAX_VALUE);
@@ -219,11 +226,11 @@ public class TomcatChooserApp extends Application {
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
     }
 
-    /** Bouton carré avec une icône verte, toutes les icônes ramenées à la même taille. */
+    /** Bouton carré avec une icône bleue, toutes les icônes ramenées à la même taille. */
     private static Button iconButton(String svg) {
         SVGPath path = new SVGPath();
         path.setContent(svg);
-        path.setStyle("-fx-fill: #2e7d32;");
+        path.setStyle("-fx-fill: #1565c0;");
         double scale = ICON_SIZE / Math.max(path.getLayoutBounds().getWidth(), path.getLayoutBounds().getHeight());
         path.setScaleX(scale);
         path.setScaleY(scale);
