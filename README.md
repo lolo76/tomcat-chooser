@@ -15,6 +15,9 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
   cliquer sur **Inactif** le décommente (y compris un bloc `<!-- … -->` sur plusieurs lignes).
 - La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.
 - Le champ **Rechercher** filtre la liste sur le nom de l'application.
+- En bas à droite, un voyant indique si **Tomcat est démarré ou arrêté** (vérifié toutes les 3 s).
+  Il teste sur localhost le port d'arrêt (`<Server port=…>`) et le port HTTP du `server.xml` choisi,
+  quel que soit le lanceur (Eclipse, startup.bat, service).
 - Un **double-clic** sur une ligne ouvre une fenêtre pour modifier les attributs du Context
   (path, docBase, reloadable, workDir…) et ceux de ses éléments `<Logger>` et `<Loader>` :
   modifier une valeur, supprimer (✕) ou ajouter un attribut. Les valeurs true/false sont des boutons.

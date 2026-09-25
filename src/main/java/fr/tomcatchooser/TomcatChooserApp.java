@@ -7,9 +7,13 @@ import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -37,6 +41,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Screen;
@@ -56,6 +61,8 @@ public class TomcatChooserApp extends Application {
     private final TableView<ContextEntry> table = new TableView<>();
     private final Label status = new Label();
     private final TextField search = new TextField();
+    private final Label tomcatState = new Label();
+    private volatile TomcatStatus tomcatStatus;
     private final ObservableList<ContextEntry> contexts = FXCollections.observableArrayList();
     private final FilteredList<ContextEntry> filtered = new FilteredList<>(contexts);
     private Stage stage;
@@ -96,10 +103,14 @@ public class TomcatChooserApp extends Application {
         searchLabel.minWidthProperty().bind(statusColumn.widthProperty().subtract(8));
         searchLabel.prefWidthProperty().bind(statusColumn.widthProperty().subtract(8));
 
-        status.setPadding(new Insets(6, 10, 8, 10));
         status.setWrapText(true);
+        status.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(status, Priority.ALWAYS);
+        HBox bottom = new HBox(12, status, tomcatState);
+        bottom.setAlignment(Pos.CENTER_LEFT);
+        bottom.setPadding(new Insets(6, 10, 8, 10));
 
-        BorderPane root = new BorderPane(table, new VBox(top, searchBar), null, status, null);
+        BorderPane root = new BorderPane(table, new VBox(top, searchBar), null, bottom, null);
         BorderPane.setMargin(table, new Insets(0, 10, 0, 10));
 
         stage.setTitle("Tomcat Chooser");
@@ -113,6 +124,7 @@ public class TomcatChooserApp extends Application {
         String param = getParameters().getRaw().isEmpty() ? null : getParameters().getRaw().get(0);
         String last = param != null ? param : prefs.get(PREF_LAST_FILE, DEFAULT_SERVER_XML.toString());
         load(Paths.get(last));
+        startTomcatMonitor();
     }
 
     private void buildTable() {
@@ -170,7 +182,7 @@ public class TomcatChooserApp extends Application {
         table.getColumns().add(action);
         table.getColumns().add(application);
         table.setFixedCellSize(ROW_HEIGHT);
-        table.setPrefWidth(460);
+        table.setPrefWidth(560);
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
     }
 
@@ -206,6 +218,7 @@ public class TomcatChooserApp extends Application {
         pathField.setText(file.toString());
         if (!Files.isRegularFile(file)) {
             serverXml = null;
+            tomcatStatus = null;
             contexts.clear();
             setStatus("Fichier introuvable : " + file + ". Cliquez sur « Parcourir… » pour choisir un server.xml.", true);
             return;
@@ -218,6 +231,7 @@ public class TomcatChooserApp extends Application {
             setStatus(serverXml.contexts().size() + " Context trouvé(s), dont " + active + " actif(s).", false);
         } catch (Exception ex) {
             serverXml = null;
+            tomcatStatus = null;
             contexts.clear();
             setStatus("Impossible de lire " + file + " : " + ex.getMessage(), true);
         }
@@ -285,7 +299,38 @@ public class TomcatChooserApp extends Application {
                 .ifPresent(c -> table.getSelectionModel().select(c));
     }
 
+    /** Vérifie toutes les 3 s si Tomcat tourne (ports de server.xml) et met à jour le voyant. */
+    private void startTomcatMonitor() {
+        tomcatState.setMinWidth(Region.USE_PREF_SIZE);
+        ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "tomcat-status");
+            t.setDaemon(true);
+            return t;
+        });
+        monitor.scheduleWithFixedDelay(() -> {
+            TomcatStatus status = tomcatStatus;
+            TomcatStatus.State state = status == null ? null : status.check();
+            Platform.runLater(() -> showTomcatState(status, state));
+        }, 0, 3, TimeUnit.SECONDS);
+    }
+
+    private void showTomcatState(TomcatStatus status, TomcatStatus.State state) {
+        if (status == null) {
+            tomcatState.setText("");
+            return;
+        }
+        boolean started = state == TomcatStatus.State.STARTED;
+        String port = status.httpPort() > 0 ? " (port " + status.httpPort() + ")" : "";
+        tomcatState.setText((started ? "● Tomcat démarré" : "● Tomcat arrêté") + port);
+        tomcatState.setStyle(started
+                ? "-fx-text-fill: #2e7d32; -fx-font-weight: bold;"
+                : "-fx-text-fill: #c62828;");
+        tomcatState.setTooltip(new Tooltip("Vérifié toutes les 3 s : port d'arrêt " + status.shutdownPort()
+                + ", port HTTP " + status.httpPort() + " sur localhost."));
+    }
+
     private void refresh() {
+        tomcatStatus = TomcatStatus.fromServerXml(serverXml.text());
         contexts.setAll(serverXml.contexts());
         table.refresh();
         fitWindowToRows();
