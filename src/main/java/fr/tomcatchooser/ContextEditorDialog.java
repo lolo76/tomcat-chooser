@@ -15,7 +15,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -27,7 +26,7 @@ import javafx.stage.Window;
  */
 final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>> {
 
-    private static final double NAME_WIDTH = 230;
+    private static final double NAME_WIDTH = 215;
 
     private final Map<String, AttributeEditor> editors = new LinkedHashMap<>();
 
@@ -52,15 +51,13 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
                 body = editor;
             }
             TitledPane pane = new TitledPane(tag, body);
-            // Seul le Context est déplié ; le Loader s'ouvre d'un clic.
-            pane.setExpanded(tag.equals("Context"));
             sections.getChildren().add(pane);
         });
 
         ScrollPane scroll = new ScrollPane(sections);
         scroll.setFitToWidth(true);
-        scroll.setPrefViewportHeight(560);
-        scroll.setPrefViewportWidth(900);
+        scroll.setPrefViewportHeight(330);
+        scroll.setPrefViewportWidth(680);
         getDialogPane().setContent(scroll);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         ((Button) getDialogPane().lookupButton(ButtonType.OK)).setText("Enregistrer");
@@ -98,7 +95,6 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
                 HBox.setHgrow(field, Priority.ALWAYS);
             }
             Button remove = new Button("✕");
-            remove.setTooltip(new Tooltip("Supprimer l'attribut " + name));
             HBox spacer = new HBox();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             HBox row = field instanceof TextField

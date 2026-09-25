@@ -24,6 +24,7 @@ import javafx.collections.transformation.SortedList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -36,7 +37,6 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
@@ -61,6 +61,10 @@ public class TomcatChooserApp extends Application {
     private static final String REFRESH_ICON = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8"
             + "c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6"
             + "c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
+    /** Icône « dossier » (Material Design). */
+    private static final String FOLDER_ICON = "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8"
+            + "c0-1.1-.9-2-2-2h-8l-2-2z";
+    private static final double ICON_SIZE = 16;
     /** Icône « modifier » (crayon, Material Design). */
     private static final String EDIT_ICON = "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"
             + "M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z";
@@ -85,47 +89,39 @@ public class TomcatChooserApp extends Application {
     public void start(Stage stage) {
         this.stage = stage;
 
-        Button browse = new Button("Parcourir…");
+        Button browse = iconButton(FOLDER_ICON);
         browse.setOnAction(e -> chooseFile());
-        Button reload = new Button();
-        SVGPath refreshIcon = new SVGPath();
-        refreshIcon.setContent(REFRESH_ICON);
-        refreshIcon.setStyle("-fx-fill: #2e7d32;");
-        reload.setGraphic(refreshIcon);
-        reload.setTooltip(new Tooltip("Recharger le fichier"));
+        Button reload = iconButton(REFRESH_ICON);
         reload.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
-        Button editFile = new Button();
-        SVGPath editIcon = new SVGPath();
-        editIcon.setContent(EDIT_ICON);
-        editIcon.setStyle("-fx-fill: #1565c0;");
-        editFile.setGraphic(editIcon);
-        editFile.setTooltip(new Tooltip("Ouvrir server.xml dans l'éditeur du système"));
+        Button editFile = iconButton(EDIT_ICON);
         editFile.setOnAction(e -> openInSystemEditor(Paths.get(pathField.getText().trim())));
         pathField.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
         HBox.setHgrow(pathField, Priority.ALWAYS);
         pathField.setPromptText("Chemin du server.xml");
-        HBox top = new HBox(8, browse, pathField, reload, editFile);
+        HBox top = new HBox(6, pathField, browse, reload, editFile);
         top.setAlignment(Pos.CENTER_LEFT);
-        top.setPadding(new Insets(10));
+        top.setPadding(new Insets(10, 10, 8, 10));
 
         search.setPromptText("Rechercher une application…");
         search.textProperty().addListener((obs, old, text) -> {
             String q = text.trim().toLowerCase();
             filtered.setPredicate(c -> q.isEmpty() || c.displayPath().toLowerCase().contains(q));
         });
-        HBox.setHgrow(search, Priority.ALWAYS);
-        // Espace de la largeur des boutons de droite : le champ de recherche finit au même endroit que le chemin.
-        Region buttonsSpace = new Region();
-        buttonsSpace.minWidthProperty().bind(reload.widthProperty().add(editFile.widthProperty()).add(8));
-        HBox searchBar = new HBox(8, search, buttonsSpace);
-        searchBar.setAlignment(Pos.CENTER_LEFT);
-        searchBar.setPadding(new Insets(0, 10, 8, 10));
 
         buildTable();
-        // Parcourir a la largeur de la colonne Statut : le chemin s'aligne sur la colonne Application.
+        // Le champ de recherche est placé au-dessus de la colonne Application, à sa largeur.
         TableColumn<ContextEntry, ?> statusColumn = table.getColumns().get(0);
-        browse.minWidthProperty().bind(statusColumn.widthProperty().subtract(8));
-        browse.prefWidthProperty().bind(statusColumn.widthProperty().subtract(8));
+        TableColumn<ContextEntry, ?> applicationColumn = table.getColumns().get(1);
+        Region statusSpace = new Region();
+        statusSpace.minWidthProperty().bind(statusColumn.widthProperty());
+        statusSpace.prefWidthProperty().bind(statusColumn.widthProperty());
+        search.minWidthProperty().bind(applicationColumn.widthProperty());
+        search.prefWidthProperty().bind(applicationColumn.widthProperty());
+        search.maxWidthProperty().bind(applicationColumn.widthProperty());
+        HBox searchBar = new HBox(0, statusSpace, search);
+        searchBar.setAlignment(Pos.CENTER_LEFT);
+        // 1 px : bordure du tableau.
+        searchBar.setPadding(new Insets(0, 11, 4, 11));
 
         status.setWrapText(true);
         status.setMaxWidth(Double.MAX_VALUE);
@@ -178,7 +174,6 @@ public class TomcatChooserApp extends Application {
                     button.setStyle(item.commented()
                             ? "-fx-base: #e0e0e0; -fx-text-fill: #666666;"
                             : "-fx-base: #2e7d32; -fx-text-fill: white; -fx-font-weight: bold;");
-                    button.setTooltip(new Tooltip(item.rawText()));
                     setGraphic(button);
                 }
             }
@@ -213,6 +208,20 @@ public class TomcatChooserApp extends Application {
         table.getStylesheets().add("data:text/css,"
                 + ".column-header-background { -fx-pref-height: 0; -fx-min-height: 0; -fx-max-height: 0; visibility: hidden; }");
         table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
+    }
+
+    /** Bouton carré avec une icône verte, toutes les icônes ramenées à la même taille. */
+    private static Button iconButton(String svg) {
+        SVGPath path = new SVGPath();
+        path.setContent(svg);
+        path.setStyle("-fx-fill: #2e7d32;");
+        double scale = ICON_SIZE / Math.max(path.getLayoutBounds().getWidth(), path.getLayoutBounds().getHeight());
+        path.setScaleX(scale);
+        path.setScaleY(scale);
+        Button button = new Button(null, new Group(path));
+        button.setMinSize(32, 28);
+        button.setPrefSize(32, 28);
+        return button;
     }
 
     private static boolean isInsideButton(Object target) {
