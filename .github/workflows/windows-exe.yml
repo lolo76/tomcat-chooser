@@ -31,10 +31,23 @@ jobs:
       # avant la concaténation, pour ne pas abîmer l'archive ajoutée à la fin.
       - name: Exe portable (un seul fichier)
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force build-tools | Out-Null
-          Invoke-WebRequest https://www.7-zip.org/a/lzma2409.7z -OutFile build-tools\lzma.7z
+          # SDK LZMA le plus récent : release GitHub de 7-Zip, sinon lien de la page sdk.html de 7-zip.org
+          $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN" }
+          $release = Invoke-RestMethod -Headers $headers https://api.github.com/repos/ip7z/7zip/releases/latest
+          $asset = $release.assets | Where-Object { $_.name -match '^lzma\d+\.7z$' } | Select-Object -First 1
+          if ($asset) {
+            $url = $asset.browser_download_url
+          } else {
+            $page = Invoke-WebRequest https://www.7-zip.org/sdk.html
+            $url = 'https://www.7-zip.org/' + ($page.Links.href | Where-Object { $_ -match 'lzma\d+\.7z$' } | Select-Object -First 1)
+          }
+          Write-Host "SDK LZMA : $url"
+          Invoke-WebRequest $url -OutFile build-tools\lzma.7z
           7z x build-tools\lzma.7z -obuild-tools\lzma -y | Out-Null
           $sfx = Get-ChildItem -Recurse build-tools\lzma -Filter 7zS2.sfx | Select-Object -First 1
           if (-not $sfx) { Get-ChildItem -Recurse build-tools\lzma | Select-Object FullName; throw "7zS2.sfx introuvable" }
@@ -54,10 +67,11 @@ jobs:
         run: |
           $p = Start-Process target\portable\TomcatChooser.exe -PassThru
           Start-Sleep -Seconds 25
-          $running = Get-Process | Where-Object { $_.ProcessName -like 'TomcatChooser*' }
-          $running | Select-Object ProcessName, Id, Path | Format-Table -AutoSize
+          # L'appli extraite (et non le lanceur portable lui-même) doit tourner.
+          $running = Get-Process | Where-Object { $_.ProcessName -like 'TomcatChooser*' -and $_.Path -and $_.Path -notlike '*target\portable*' }
+          Get-Process | Where-Object { $_.ProcessName -like 'TomcatChooser*' } | Select-Object ProcessName, Id, Path | Format-Table -AutoSize
           if (-not $running) { throw "TomcatChooser ne tourne pas après 25 s" }
-          $running | Stop-Process -Force
+          Get-Process | Where-Object { $_.ProcessName -like 'TomcatChooser*' } | Stop-Process -Force
 
       - name: Publier l'exe portable
         uses: actions/upload-artifact@v4
