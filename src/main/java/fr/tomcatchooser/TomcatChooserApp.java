@@ -149,6 +149,15 @@ public class TomcatChooserApp extends Application {
         startTomcatMonitor();
     }
 
+    /**
+     * Termine le processus à la fermeture de la fenêtre. Sans cela, les threads AWT démarrés par
+     * le bouton « éditer » (java.awt.Desktop) gardent l'exe en vie, et son fichier reste verrouillé.
+     */
+    @Override
+    public void stop() {
+        System.exit(0);
+    }
+
     private void buildTable() {
         TableColumn<ContextEntry, String> application = new TableColumn<>("Application");
         application.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().displayPath()));
