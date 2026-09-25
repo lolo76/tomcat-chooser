@@ -1,6 +1,6 @@
 # Tomcat Chooser
 
-Petite application Windows (JavaFX, Java 26) qui liste les `<Context>` d'un `server.xml`
+Petite application Windows (JavaFX, Java 21) qui liste les `<Context>` d'un `server.xml`
 Tomcat et permet de les **commenter / décommenter d'un clic**.
 
 ![Capture](docs/capture.png)
@@ -38,7 +38,7 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 
 ## Prérequis (Windows)
 
-- JDK 26 (par exemple Eclipse Temurin 26), avec `JAVA_HOME` défini
+- JDK 21 (par exemple Eclipse Temurin 21), avec `JAVA_HOME` défini
 - Maven 3.8 ou plus récent
 
 JavaFX est téléchargé automatiquement par Maven (version Windows).
@@ -61,7 +61,7 @@ Dans l'onglet **Actions** du dépôt, ouvrez la dernière exécution et téléch
 
 1. Clic droit sur le projet > Run As > **Maven build…**
 2. Goals : `clean package javafx:jlink exec:exec@jpackage`
-3. Onglet **JRE** : choisissez un **JDK 26** (pas un simple JRE : `jpackage` est fourni avec le JDK).
+3. Onglet **JRE** : choisissez un **JDK 21** (pas un simple JRE : `jpackage` est fourni avec le JDK).
 4. Run.
 
 Résultat : `target\dist\TomcatChooser\TomcatChooser.exe`, avec l'icône Tomcat et son propre Java.
