@@ -1,6 +1,6 @@
 # Tomcat Chooser
 
-Petite application Windows (JavaFX, Java 25) qui liste les `<Context>` d'un `server.xml`
+Petite application Windows, Mac et Linux (JavaFX, Java 25) qui liste les `<Context>` d'un `server.xml`
 Tomcat et permet de les **commenter / décommenter d'un clic**.
 
 ![Capture](docs/capture.png)
@@ -52,26 +52,39 @@ cd tomcat-chooser
 mvn javafx:run
 ```
 
-## Télécharger l'exe Windows
+## Télécharger l'application
 
-Chaque version publiée se trouve dans les **Releases** du dépôt : téléchargez
-`TomcatChooser-windows.zip`, dézippez-le et lancez `TomcatChooser\TomcatChooser.exe`
-(son Java est embarqué, aucune installation n'est nécessaire).
+Chaque version publiée se trouve dans les **Releases** du dépôt, avec un paquet par système.
+Java est embarqué dans chaque paquet : aucune installation n'est nécessaire.
+
+- **Windows** : `TomcatChooser-windows.zip`. Dézippez-le et lancez `TomcatChooser\TomcatChooser.exe`.
+- **Mac** (Apple Silicon, M1 et suivants) : `TomcatChooser-mac.zip`. Dézippez-le et placez
+  `TomcatChooser.app` dans Applications. L'application n'est pas signée : au premier lancement,
+  faites clic droit > **Ouvrir** puis confirmez (ou `xattr -cr /Applications/TomcatChooser.app`).
+- **Linux** (x64) : `TomcatChooser-linux.tar.gz`. Décompressez-le
+  (`tar xzf TomcatChooser-linux.tar.gz`) et lancez `TomcatChooser/bin/TomcatChooser`.
+
+Au premier lancement, le fichier proposé est `C:\Tomcat70\conf\server.xml` sous Windows, et
+`$CATALINA_HOME/conf/server.xml` (ou `/opt/tomcat/conf/server.xml`) sur Mac et Linux.
 
 ### Publier une nouvelle version
 
 Créez un tag de version commençant par `v` (par exemple `v1.0.0`) et poussez-le :
-GitHub construit l'exe sous Windows puis crée la release avec le zip en pièce jointe.
+GitHub construit l'application sous Windows, Mac et Linux puis crée la release avec les trois paquets.
 
 - **Depuis GitHub** : page du dépôt > **Releases** > **Draft a new release** > *Choose a tag*,
-  tapez `v1.0.0` > *Create new tag* > **Publish release**. Le zip est ajouté à la release
+  tapez `v1.0.0` > *Create new tag* > **Publish release**. Les paquets sont ajoutés à la release
   quelques minutes plus tard.
-- **Depuis Eclipse** : clic droit sur le projet > Team > **Advanced > Tag…** (ou *Create Tag…*),
+- **Depuis Eclipse** : clic droit sur le projet > Team > **Advanced > Tag…**,
   nom `v1.0.0`, message, OK ; puis Team > **Push Tags…** vers `origin`.
 
-Le numéro du tag devient la version de l'exe. On peut aussi lancer le build à la main
-(onglet **Actions** > « Exe Windows » > **Run workflow**) : l'exe est alors disponible comme
-artefact **TomcatChooser-windows** de l'exécution, sans release.
+Le numéro du tag devient la version de l'application. On peut aussi lancer le build à la main
+(onglet **Actions** > « Release » > **Run workflow**) : les paquets sont alors disponibles comme
+artefacts de l'exécution, sans release.
+
+## Tester sur Mac ou Linux sans paquet
+
+Avec un JDK 25 et Maven installés : `mvn javafx:run` dans le dossier du projet.
 
 ## Construire l'exe Windows soi-même (depuis Eclipse)
 

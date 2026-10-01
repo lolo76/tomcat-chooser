@@ -52,7 +52,7 @@ import javafx.stage.Stage;
 /** Fenêtre principale : liste des Context de server.xml avec un bouton pour (dé)commenter chacun. */
 public class TomcatChooserApp extends Application {
 
-    static final Path DEFAULT_SERVER_XML = Paths.get("C:\\Tomcat70\\conf\\server.xml");
+    static final Path DEFAULT_SERVER_XML = defaultServerXml();
     private static final String PREF_LAST_FILE = "lastServerXml";
     private static final double ROW_HEIGHT = 30;
     private static final double STATUS_WIDTH = 110;
@@ -82,6 +82,19 @@ public class TomcatChooserApp extends Application {
     private Region header;
     private Region footer;
     private ServerXml serverXml;
+
+    /**
+     * server.xml proposé au premier lancement : C:\Tomcat70 sous Windows ; ailleurs, celui de
+     * $CATALINA_HOME s'il est défini, sinon /opt/tomcat.
+     */
+    private static Path defaultServerXml() {
+        if (System.getProperty("os.name", "").startsWith("Windows")) {
+            return Paths.get("C:\\Tomcat70\\conf\\server.xml");
+        }
+        String catalinaHome = System.getenv("CATALINA_HOME");
+        Path home = catalinaHome != null && !catalinaHome.isBlank() ? Paths.get(catalinaHome) : Paths.get("/opt/tomcat");
+        return home.resolve("conf").resolve("server.xml");
+    }
 
     public static void main(String[] args) {
         launch(args);

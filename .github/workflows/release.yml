@@ -1,0 +1,87 @@
+name: Release
+
+# Pousser un tag de version (ex. v1.0.0) construit l'application pour Windows, Mac et Linux
+# et crée la release GitHub avec les trois paquets. Lancement manuel aussi possible
+# (Actions > Release > Run workflow) : les paquets sont alors de simples artefacts, sans release.
+# Pas de build à chaque commit.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            package: TomcatChooser-windows.zip
+          - os: macos-latest
+            package: TomcatChooser-mac.zip
+          - os: ubuntu-latest
+            package: TomcatChooser-linux.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Version de l'application
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" =~ ^v([0-9]+(\.[0-9]+){0,2})$ ]]; then
+            echo "app=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tests, image jlink et application (jpackage)
+        shell: bash
+        run: |
+          ARGS=""
+          if [ -n "${{ steps.version.outputs.app }}" ]; then ARGS="-Dapp.version=${{ steps.version.outputs.app }}"; fi
+          mvn -B clean package javafx:jlink exec:exec@jpackage $ARGS
+
+      - name: Paquet Windows (zip du dossier de l'exe)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path target/dist/TomcatChooser -DestinationPath target/${{ matrix.package }}
+
+      - name: Paquet Mac (zip de TomcatChooser.app)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent target/dist/TomcatChooser.app target/${{ matrix.package }}
+
+      - name: Paquet Linux (tar.gz, garde les droits d'exécution)
+        if: runner.os == 'Linux'
+        run: tar -C target/dist -czf target/${{ matrix.package }} TomcatChooser
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}
+          path: target/${{ matrix.package }}
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Créer la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Tomcat Chooser ${{ github.ref_name }}
+          files: packages/*
+          generate_release_notes: true

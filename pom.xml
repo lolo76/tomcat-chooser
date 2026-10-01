@@ -152,5 +152,17 @@
                 <jpackage.icon>${project.basedir}/packaging/tomcat.png</jpackage.icon>
             </properties>
         </profile>
+        <!-- Mac (aussi de la famille unix) : déclaré après unix pour que son icône .icns l'emporte -->
+        <profile>
+            <id>mac</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                </os>
+            </activation>
+            <properties>
+                <jpackage.icon>${project.basedir}/packaging/tomcat.icns</jpackage.icon>
+            </properties>
+        </profile>
     </profiles>
 </project>
