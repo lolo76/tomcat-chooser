@@ -11,6 +11,9 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Maven 4 : masque l'avertissement « Plugin is modifying testCompileSourceRoots through add() »
+             émis pour des plugins encore écrits pour Maven 3 (sans effet sur le build). -->
+        <maven.project.sourceRoots.warningsDisabled>true</maven.project.sourceRoots.warningsDisabled>
         <maven.compiler.release>25</maven.compiler.release>
         <!-- Version de l'exe ; le workflow de release la remplace par celle du tag (v1.2.3 -> 1.2.3). -->
         <app.version>${project.version}</app.version>
