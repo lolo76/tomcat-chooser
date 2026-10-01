@@ -54,10 +54,24 @@ mvn javafx:run
 
 ## Télécharger l'exe Windows
 
-GitHub Actions peut construire l'exe sous Windows à la demande : onglet **Actions** > « Exe Windows » > **Run workflow**.
-Dans l'onglet **Actions** du dépôt, ouvrez la dernière exécution et téléchargez l'artefact
-**TomcatChooser-windows** : c'est un zip contenant `TomcatChooser.exe` et son Java embarqué
-(aucune installation de Java n'est nécessaire). Dézippez-le et lancez `TomcatChooser.exe`.
+Chaque version publiée se trouve dans les **Releases** du dépôt : téléchargez
+`TomcatChooser-windows.zip`, dézippez-le et lancez `TomcatChooser\TomcatChooser.exe`
+(son Java est embarqué, aucune installation n'est nécessaire).
+
+### Publier une nouvelle version
+
+Créez un tag de version commençant par `v` (par exemple `v1.0.0`) et poussez-le :
+GitHub construit l'exe sous Windows puis crée la release avec le zip en pièce jointe.
+
+- **Depuis GitHub** : page du dépôt > **Releases** > **Draft a new release** > *Choose a tag*,
+  tapez `v1.0.0` > *Create new tag* > **Publish release**. Le zip est ajouté à la release
+  quelques minutes plus tard.
+- **Depuis Eclipse** : clic droit sur le projet > Team > **Advanced > Tag…** (ou *Create Tag…*),
+  nom `v1.0.0`, message, OK ; puis Team > **Push Tags…** vers `origin`.
+
+Le numéro du tag devient la version de l'exe. On peut aussi lancer le build à la main
+(onglet **Actions** > « Exe Windows » > **Run workflow**) : l'exe est alors disponible comme
+artefact **TomcatChooser-windows** de l'exécution, sans release.
 
 ## Construire l'exe Windows soi-même (depuis Eclipse)
 

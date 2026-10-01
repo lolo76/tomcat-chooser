@@ -12,6 +12,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>25</maven.compiler.release>
+        <!-- Version de l'exe ; le workflow de release la remplace par celle du tag (v1.2.3 -> 1.2.3). -->
+        <app.version>${project.version}</app.version>
         <javafx.version>25.0.4</javafx.version>
         <junit.version>5.10.2</junit.version>
         <mainClass>fr.tomcatchooser/fr.tomcatchooser.TomcatChooserApp</mainClass>
@@ -107,7 +109,7 @@
                                 <argument>--name</argument>
                                 <argument>TomcatChooser</argument>
                                 <argument>--app-version</argument>
-                                <argument>${project.version}</argument>
+                                <argument>${app.version}</argument>
                                 <argument>--runtime-image</argument>
                                 <argument>${project.build.directory}/tomcat-chooser</argument>
                                 <argument>--module</argument>
