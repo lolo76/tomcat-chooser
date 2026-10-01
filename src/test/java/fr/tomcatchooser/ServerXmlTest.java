@@ -266,4 +266,57 @@ class ServerXmlTest {
         assertEquals(LIGNE_PAR_LIGNE.replace("verbosity=\"4\"", "verbosity=\"2\"").replace("debug=\"1\"", "debug=\"0\""),
                 Files.readString(f));
     }
+
+    @Test
+    void ajouteUnContextApresLeDernier() throws Exception {
+        Path f = write(SERVER_XML);
+        ServerXml xml = ServerXml.load(f);
+        Map<String, String> attrs = new java.util.LinkedHashMap<>();
+        attrs.put("path", "nouvelle");
+        attrs.put("docBase", "C:/apps/nouvelle & co");
+        attrs.put("reloadable", "true");
+        attrs.put("workDir", "");
+        ContextEntry added = xml.addContext(attrs);
+
+        assertEquals("/nouvelle", added.path());
+        assertFalse(added.commented());
+        assertEquals(5, xml.contexts().size());
+        String text = Files.readString(f);
+        assertTrue(text.contains("        </Context>\r\n        <Context path=\"/nouvelle\" "
+                + "docBase=\"C:/apps/nouvelle &amp; co\" reloadable=\"true\"/>\r\n      </Host>"), text);
+        // Le nouveau Context se désactive et se réactive comme les autres.
+        ContextEntry off = xml.toggle(added);
+        assertTrue(off.commented());
+        ServerXml reloaded = ServerXml.load(f);
+        assertEquals("C:/apps/nouvelle & co", reloaded.attributes(reloaded.contexts().get(4)).get("docBase"));
+    }
+
+    @Test
+    void ajouteAvantHostSansAucunContext() throws Exception {
+        Path f = write("""
+                <Server port="8005">
+                  <Service name="Catalina">
+                    <Engine name="Catalina" defaultHost="localhost">
+                      <Host name="localhost" appBase="webapps">
+                        <!-- </Host> dans un commentaire -->
+                      </Host>
+                    </Engine>
+                  </Service>
+                </Server>
+                """);
+        ServerXml xml = ServerXml.load(f);
+        xml.addContext(Map.of("path", "", "docBase", "/srv/root"));
+        assertEquals(1, xml.contexts().size());
+        assertEquals("ROOT", xml.contexts().get(0).displayPath());
+        assertTrue(Files.readString(f).contains(
+                "-->\n        <Context path=\"\" docBase=\"/srv/root\"/>\n      </Host>"), Files.readString(f));
+    }
+
+    @Test
+    void refuseUnDoublonOuSansDocBase() throws Exception {
+        ServerXml xml = ServerXml.load(write(SERVER_XML));
+        assertThrows(java.io.IOException.class, () -> xml.addContext(Map.of("path", "/appli2", "docBase", "x")));
+        assertThrows(java.io.IOException.class, () -> xml.addContext(Map.of("path", "/autre", "docBase", " ")));
+        assertEquals(4, xml.contexts().size());
+    }
 }

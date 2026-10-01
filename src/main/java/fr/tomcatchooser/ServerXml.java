@@ -157,6 +157,88 @@ public final class ServerXml {
         return contexts.get(entry.index());
     }
 
+    /**
+     * Ajoute un nouveau {@code <Context .../>} actif, juste après le dernier Context du fichier
+     * (même indentation), ou avant {@code </Host>} s'il n'y en a aucun. Les valeurs vides sont ignorées.
+     *
+     * @return le Context ajouté
+     */
+    public ContextEntry addContext(Map<String, String> attributes) throws IOException {
+        // path toujours présent et en premier ; "" = application ROOT.
+        String path = attributes.getOrDefault("path", "") == null ? "" : attributes.getOrDefault("path", "").trim();
+        if (!path.isEmpty() && !path.startsWith("/")) {
+            path = "/" + path;
+        }
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("path", path);
+        attributes.forEach((name, value) -> {
+            if (!name.equals("path") && value != null && !value.isBlank()) {
+                attrs.put(name, value.trim());
+            }
+        });
+        if (!attrs.containsKey("docBase")) {
+            throw new IOException("Indiquez le docBase (dossier de l'application).");
+        }
+        reload();
+        for (ContextEntry c : contexts) {
+            if (c.path() != null && c.path().equals(path)) {
+                throw new IOException("Un Context " + c.displayPath() + " existe déjà.");
+            }
+        }
+
+        String newline = text.contains("\r\n") ? "\r\n" : "\n";
+        StringBuilder tag = new StringBuilder("<Context");
+        attrs.forEach((name, value) ->
+                tag.append(' ').append(name).append("=\"").append(escape(value, "\"")).append('"'));
+        tag.append("/>");
+
+        int insertAt;
+        String indent;
+        if (!contexts.isEmpty()) {
+            ContextEntry last = contexts.get(contexts.size() - 1);
+            insertAt = last.end();
+            indent = lineIndent(text, last.start());
+        } else {
+            int hostEnd = indexOutsideComments(text, "</Host>");
+            if (hostEnd < 0) {
+                throw new IOException("Aucune balise </Host> trouvée : impossible d'ajouter un Context.");
+            }
+            int lineStart = text.lastIndexOf('\n', hostEnd - 1) + 1;
+            String hostIndent = lineIndent(text, hostEnd);
+            insertAt = lineStart > 0 ? lineStart - (text.startsWith("\r\n", lineStart - 2) ? 2 : 1) : hostEnd;
+            indent = hostIndent + (hostIndent.contains("\t") ? "\t" : "  ");
+        }
+        String newText = text.substring(0, insertAt) + newline + indent + tag + text.substring(insertAt);
+        validateXml(newText);
+        save(newText);
+        int tagStart = insertAt + newline.length() + indent.length();
+        return contexts.stream().filter(c -> c.start() == tagStart).findFirst()
+                .orElseThrow(() -> new IOException("Le Context ajouté n'a pas été retrouvé."));
+    }
+
+    /** Espaces en début de la ligne qui contient la position donnée. */
+    private static String lineIndent(String text, int pos) {
+        int lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+        return text.substring(lineStart, lineStart + horizontalWhitespace(text, lineStart));
+    }
+
+    /** Première occurrence hors commentaires XML ; -1 si absente. */
+    private static int indexOutsideComments(String text, String needle) {
+        int from = 0;
+        while (true) {
+            int found = text.indexOf(needle, from);
+            if (found < 0) {
+                return -1;
+            }
+            int open = text.lastIndexOf("<!--", found);
+            int close = open < 0 ? -1 : text.indexOf("-->", open);
+            if (open < 0 || (close >= 0 && close < found)) {
+                return found;
+            }
+            from = close < 0 ? text.length() : close + 3;
+        }
+    }
+
     /** Relit le fichier et vérifie que le Context n'a pas changé depuis l'affichage. */
     private ContextEntry reloadAndCheck(ContextEntry entry) throws IOException {
         // Le fichier a pu être modifié à la main entre-temps : on relit et on vérifie.

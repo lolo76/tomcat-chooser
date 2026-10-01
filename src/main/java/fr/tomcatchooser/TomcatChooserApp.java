@@ -57,6 +57,8 @@ public class TomcatChooserApp extends Application {
     private static final double ROW_HEIGHT = 30;
     private static final double STATUS_WIDTH = 110;
     private static final double FOOTER_SPACING = 12;
+    /** Marge intérieure d'une cellule du tableau (style modena) : écart entre bord de colonne et bouton. */
+    private static final double CELL_PADDING = 3;
     /** Icône « recharger » (flèche circulaire, Material Design). */
     private static final String REFRESH_ICON = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8"
             + "c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6"
@@ -81,6 +83,8 @@ public class TomcatChooserApp extends Application {
     private Stage stage;
     private Region header;
     private Region footer;
+    private Region footerStatus;
+    private final Button addButton = new Button("Ajouter");
     private ServerXml serverXml;
 
     /**
@@ -155,9 +159,20 @@ public class TomcatChooserApp extends Application {
         bottom.setAlignment(Pos.CENTER_LEFT);
         bottom.setPadding(new Insets(6, 10, 8, 10));
 
+        // Bouton Ajouter sous le tableau, aligné sur les boutons Actif / Inactif et de même taille.
+        addButton.setOnAction(e -> addContext());
+        addButton.setDisable(true);
+        addButton.setStyle("-fx-base: #1565c0; -fx-text-fill: white; -fx-font-weight: bold;");
+        addButton.minWidthProperty().bind(statusColumn.widthProperty().subtract(2 * CELL_PADDING));
+        addButton.prefWidthProperty().bind(statusColumn.widthProperty().subtract(2 * CELL_PADDING));
+        HBox addRow = new HBox(addButton);
+        addRow.setAlignment(Pos.CENTER_LEFT);
+        addRow.setPadding(new Insets(4, 11, 0, 11 + CELL_PADDING));
+
         header = new VBox(top, searchBar);
-        footer = bottom;
-        BorderPane root = new BorderPane(table, header, null, bottom, null);
+        footerStatus = bottom;
+        footer = new VBox(addRow, bottom);
+        BorderPane root = new BorderPane(table, header, null, footer, null);
         BorderPane.setMargin(table, new Insets(0, 10, 0, 10));
 
         stage.setTitle("Tomcat Chooser");
@@ -333,6 +348,7 @@ public class TomcatChooserApp extends Application {
         pathField.setText(file.toString());
         if (!Files.isRegularFile(file)) {
             serverXml = null;
+            addButton.setDisable(true);
             tomcatStatus = null;
             contexts.clear();
             setStatus("Fichier introuvable : " + file + ". Cliquez sur « Parcourir… » pour choisir un server.xml.", true);
@@ -340,12 +356,14 @@ public class TomcatChooserApp extends Application {
         }
         try {
             serverXml = ServerXml.load(file);
+            addButton.setDisable(false);
             prefs.put(PREF_LAST_FILE, file.toString());
             refresh();
             long active = serverXml.contexts().stream().filter(c -> !c.commented()).count();
             setStatus(serverXml.contexts().size() + " Context trouvé(s), dont " + active + " actif(s).", false);
         } catch (Exception ex) {
             serverXml = null;
+            addButton.setDisable(true);
             tomcatStatus = null;
             contexts.clear();
             setStatus("Impossible de lire " + file + " : " + ex.getMessage(), true);
@@ -409,6 +427,32 @@ public class TomcatChooserApp extends Application {
         }
     }
 
+    /** Ajoute un Context : fenêtre de saisie vide, puis insertion dans server.xml. */
+    private void addContext() {
+        if (serverXml == null) {
+            return;
+        }
+        Map<String, String> blank = new LinkedHashMap<>();
+        blank.put("path", "");
+        blank.put("docBase", "");
+        blank.put("reloadable", "true");
+        Map<String, Map<String, String>> byTag = new LinkedHashMap<>();
+        byTag.put("Context", blank);
+        Optional<Map<String, Map<String, String>>> result =
+                new ContextEditorDialog(stage, null, byTag).showAndWait();
+        if (result.isEmpty()) {
+            return;
+        }
+        try {
+            ContextEntry added = serverXml.addContext(result.get().get("Context"));
+            refresh();
+            select(added);
+            setStatus("Context " + added.displayPath() + " ajouté. Redémarrez Tomcat pour appliquer.", false);
+        } catch (Exception ex) {
+            showError(ex);
+        }
+    }
+
     private void select(ContextEntry entry) {
         table.getItems().stream().filter(c -> c.index() == entry.index()).findFirst()
                 .ifPresent(c -> table.getSelectionModel().select(c));
@@ -467,9 +511,10 @@ public class TomcatChooserApp extends Application {
         // Hauteurs du haut et du bas calculées à la largeur réelle : le message du bas peut
         // tenir sur plusieurs lignes, ce que la taille « préférée » par défaut ignore.
         double width = root.prefWidth(-1);
-        Insets pad = footer.getInsets();
+        Insets pad = footerStatus.getInsets();
         double statusWidth = width - pad.getLeft() - pad.getRight() - tomcatState.prefWidth(-1) - FOOTER_SPACING;
-        double footerHeight = pad.getTop() + pad.getBottom()
+        double footerHeight = ((VBox) footer).getChildren().get(0).prefHeight(width)
+                + pad.getTop() + pad.getBottom()
                 + Math.max(status.prefHeight(statusWidth), tomcatState.prefHeight(-1));
         double others = header.prefHeight(width) + footerHeight;
 

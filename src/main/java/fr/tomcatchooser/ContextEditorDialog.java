@@ -30,11 +30,20 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
 
     private final Map<String, AttributeEditor> editors = new LinkedHashMap<>();
 
-    /** @param byTag attributs par balise ; une valeur null signifie que la balise est absente. */
+    /**
+     * @param entry Context modifié, ou null pour en ajouter un
+     * @param byTag attributs par balise ; une valeur null signifie que la balise est absente.
+     */
     ContextEditorDialog(Window owner, ContextEntry entry, Map<String, Map<String, String>> byTag) {
         initOwner(owner);
-        setTitle("Modifier le Context");
-        setHeaderText("Application : " + entry.displayPath() + (entry.commented() ? "   (inactif)" : "   (actif)"));
+        if (entry == null) {
+            // Nouveau Context : path vide = application ROOT, le « / » initial est ajouté si absent.
+            setTitle("Ajouter un Context");
+            setHeaderText("Nouvelle application (path sans « / », docBase obligatoire)");
+        } else {
+            setTitle("Modifier le Context");
+            setHeaderText("Application : " + entry.displayPath() + (entry.commented() ? "   (inactif)" : "   (actif)"));
+        }
         setResizable(true);
 
         VBox sections = new VBox(10);
@@ -56,11 +65,16 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
 
         ScrollPane scroll = new ScrollPane(sections);
         scroll.setFitToWidth(true);
-        scroll.setPrefViewportHeight(330);
+        // Hauteur estimée d'après le contenu (pas de grand vide pour un Context seul), au plus 330.
+        double estimate = 24;
+        for (Map<String, String> attributes : byTag.values()) {
+            estimate += 26 + 16 + (attributes == null ? 20 : attributes.size() * 31) + 10;
+        }
+        scroll.setPrefViewportHeight(Math.min(330, estimate));
         scroll.setPrefViewportWidth(820);
         getDialogPane().setContent(scroll);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        ((Button) getDialogPane().lookupButton(ButtonType.OK)).setText("Enregistrer");
+        ((Button) getDialogPane().lookupButton(ButtonType.OK)).setText(entry == null ? "Ajouter" : "Enregistrer");
         ((Button) getDialogPane().lookupButton(ButtonType.CANCEL)).setText("Annuler");
 
         setResultConverter(button -> {

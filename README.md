@@ -20,6 +20,9 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 - En bas à droite, un voyant indique si **Tomcat est démarré ou arrêté** (vérifié toutes les 3 s).
   Il teste sur localhost le port HTTP du `server.xml` choisi (jamais le port d'arrêt),
   quel que soit le lanceur (Eclipse, startup.bat, service).
+- Le bouton **Ajouter**, sous la liste, crée un nouveau Context : saisissez le `path` (sans `/`,
+  vide pour ROOT), le `docBase` et `reloadable`. Il est inséré actif après le dernier Context,
+  avec la même indentation.
 - Un **double-clic** sur une ligne ouvre une fenêtre pour modifier les attributs du Context
   (path, docBase, reloadable, workDir…) et ceux de son élément `<Loader>` :
   modifier une valeur ou supprimer (✕) un attribut. Les valeurs true/false sont des boutons.
