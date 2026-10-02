@@ -164,34 +164,138 @@ public final class ServerXml {
      * @return le Context ajouté
      */
     public ContextEntry addContext(Map<String, String> attributes) throws IOException {
+        return addContextTags(Map.of("Context", attributes));
+    }
+
+    /**
+     * Comme {@link #addContext(Map)}, avec en plus un élément {@code <Loader>} à l'intérieur du Context
+     * (clé "Loader") s'il a un className. Les valeurs vides sont ignorées.
+     */
+    public ContextEntry addContextTags(Map<String, Map<String, String>> byTag) throws IOException {
+        Map<String, String> attributes = byTag.getOrDefault("Context", Map.of());
         // path toujours présent et en premier ; "" = application ROOT.
-        String path = attributes.getOrDefault("path", "") == null ? "" : attributes.getOrDefault("path", "").trim();
-        if (!path.isEmpty() && !path.startsWith("/")) {
-            path = "/" + path;
-        }
+        String path = normalizePath(attributes.get("path"));
         Map<String, String> attrs = new LinkedHashMap<>();
         attrs.put("path", path);
-        attributes.forEach((name, value) -> {
-            if (!name.equals("path") && value != null && !value.isBlank()) {
-                attrs.put(name, value.trim());
-            }
-        });
+        attrs.putAll(nonBlank(attributes));
+        attrs.put("path", path);
         if (!attrs.containsKey("docBase")) {
             throw new IOException("Indiquez le docBase (dossier de l'application).");
         }
+        Map<String, String> loader = nonBlank(byTag.get("Loader"));
         reload();
+        checkPathFree(path);
+
+        if (!loader.containsKey("className")) {
+            return insertContext(tag("Context", attrs, true));
+        }
+        // <Context ...> puis le Loader indenté d'une tabulation, puis </Context>, comme les Context existants.
+        String newline = text.contains("\r\n") ? "\r\n" : "\n";
+        String indent = contexts.isEmpty() ? "" : lineIndent(text, contexts.get(contexts.size() - 1).start());
+        return insertContext(tag("Context", attrs, false) + newline
+                + indent + "\t" + tag("Loader", loader, true) + newline
+                + indent + "</Context>");
+    }
+
+    /** Valeurs non vides, sans les blancs autour ; vide si attributes est null. */
+    private static Map<String, String> nonBlank(Map<String, String> attributes) {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (attributes != null) {
+            attributes.forEach((name, value) -> {
+                if (value != null && !value.isBlank()) {
+                    result.put(name, value.trim());
+                }
+            });
+        }
+        return result;
+    }
+
+    private static String tag(String name, Map<String, String> attrs, boolean selfClosing) {
+        StringBuilder tag = new StringBuilder("<").append(name);
+        attrs.forEach((attr, value) ->
+                tag.append(' ').append(attr).append("=\"").append(escape(value, "\"")).append('"'));
+        return tag.append(selfClosing ? "/>" : ">").toString();
+    }
+
+    /**
+     * Supprime le Context (actif ou commenté) du fichier, avec sa ligne s'il y est seul, puis enregistre.
+     */
+    public void deleteContext(ContextEntry entry) throws IOException {
+        ContextEntry current = reloadAndCheck(entry);
+        int start = current.start();
+        int end = current.end();
+        int lineStart = text.lastIndexOf('\n', start - 1) + 1;
+        int lineEnd = text.indexOf('\n', end);
+        String after = lineEnd < 0 ? text.substring(end) : text.substring(end, lineEnd);
+        if (text.substring(lineStart, start).isBlank() && after.isBlank()) {
+            start = lineStart;
+            end = lineEnd < 0 ? text.length() : lineEnd + 1;
+        }
+        String newText = text.substring(0, start) + text.substring(end);
+        validateXml(newText);
+        save(newText);
+    }
+
+    /**
+     * Ajoute une copie complète du Context donné (éléments enfants compris : Loader, Resource…),
+     * active même si l'original est commenté, après le dernier Context. Les attributs donnés par balise
+     * (Context, Loader) remplacent ceux de l'original.
+     *
+     * @return le Context ajouté
+     */
+    public ContextEntry duplicateContext(ContextEntry source, Map<String, Map<String, String>> byTag)
+            throws IOException {
+        ContextEntry current = reloadAndCheck(source);
+        String region = text.substring(current.start(), current.end());
+        String element = current.commented()
+                ? uncomment(region, new ContextEntry(0, 0, region.length(), true, "", "", 1, region)).strip()
+                : region;
+
+        Map<String, String> contextAttrs = new LinkedHashMap<>(byTag.getOrDefault("Context", Map.of()));
+        String path = normalizePath(contextAttrs.get("path"));
+        contextAttrs.put("path", path);
+        contextAttrs.values().removeIf(v -> v == null);
+        if (contextAttrs.getOrDefault("docBase", "").isBlank()) {
+            throw new IOException("Indiquez le docBase (dossier de l'application).");
+        }
+        checkPathFree(path);
+
+        Map<String, Map<String, String>> changes = new LinkedHashMap<>(byTag);
+        changes.put("Context", contextAttrs);
+        // Positions dans la copie, de la fin vers le début pour qu'elles restent valables.
+        ContextEntry copy = new ContextEntry(0, 0, element.length(), false, path, "", 1, element);
+        TreeMap<Integer, Map<String, String>> byPosition = new TreeMap<>(Comparator.reverseOrder());
+        for (Map.Entry<String, Map<String, String>> e : changes.entrySet()) {
+            int start = e.getValue() == null ? -1 : tagStart(element, copy, e.getKey());
+            if (start >= 0) {
+                byPosition.put(start, e.getValue());
+            }
+        }
+        for (Map.Entry<Integer, Map<String, String>> e : byPosition.entrySet()) {
+            int start = e.getKey();
+            String tag = element.substring(start, openTagEnd(element, start));
+            element = element.substring(0, start) + rewriteTag(tag, e.getValue()) + element.substring(start + tag.length());
+        }
+        return insertContext(element);
+    }
+
+    /** "appli" ou "/appli" donne "/appli" ; vide = application ROOT. */
+    private static String normalizePath(String path) {
+        String p = path == null ? "" : path.trim();
+        return p.isEmpty() || p.startsWith("/") ? p : "/" + p;
+    }
+
+    private void checkPathFree(String path) throws IOException {
         for (ContextEntry c : contexts) {
             if (c.path() != null && c.path().equals(path)) {
                 throw new IOException("Un Context " + c.displayPath() + " existe déjà.");
             }
         }
+    }
 
+    /** Insère l'élément après le dernier Context (même indentation), ou avant {@code </Host>}, puis enregistre. */
+    private ContextEntry insertContext(String tag) throws IOException {
         String newline = text.contains("\r\n") ? "\r\n" : "\n";
-        StringBuilder tag = new StringBuilder("<Context");
-        attrs.forEach((name, value) ->
-                tag.append(' ').append(name).append("=\"").append(escape(value, "\"")).append('"'));
-        tag.append("/>");
-
         int insertAt;
         String indent;
         if (!contexts.isEmpty()) {

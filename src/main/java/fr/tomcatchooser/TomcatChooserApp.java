@@ -5,6 +5,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -14,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 
 import javafx.application.Application;
+import javafx.application.ColorScheme;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
@@ -30,6 +33,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
@@ -37,6 +41,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
@@ -44,37 +49,87 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.SVGPath;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
-/** Fenêtre principale : liste des Context de server.xml avec un bouton pour (dé)commenter chacun. */
+/**
+ * Fenêtre principale : état et contrôle de Tomcat, puis la liste des Context de server.xml avec
+ * un point vert (actif) ou rouge (inactif) pour (dé)commenter chacun. Tout est actualisé toutes les 3 s.
+ */
 public class TomcatChooserApp extends Application {
 
     static final Path DEFAULT_SERVER_XML = defaultServerXml();
     private static final String PREF_LAST_FILE = "lastServerXml";
     private static final double ROW_HEIGHT = 30;
-    private static final double STATUS_WIDTH = 110;
-    private static final double FOOTER_SPACING = 12;
-    /** Marge intérieure d'une cellule du tableau (style modena) : écart entre bord de colonne et bouton. */
-    private static final double CELL_PADDING = 3;
-    /** Icône « recharger » (flèche circulaire, Material Design). */
-    private static final String REFRESH_ICON = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8"
-            + "c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6"
-            + "c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
+    /** Colonne du point vert / rouge : juste sa largeur. */
+    private static final double STATUS_WIDTH = 36;
+    private static final double APPLICATION_WIDTH = 236;
+    /** Nombre maximal de lignes affichées avant l'ascenseur. */
+    private static final int MAX_ROWS = 10;
+    private static final double DOT_RADIUS = 7;
+    /** Taille du texte d'état de Tomcat, plus petit que le reste. */
+    private static final double STATE_FONT_SIZE = 11;
     /** Icône « dossier » (Material Design). */
     private static final String FOLDER_ICON = "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8"
             + "c0-1.1-.9-2-2-2h-8l-2-2z";
-    private static final double ICON_SIZE = 16;
+    private static final double ICON_SIZE = 18;
+    /** Côté des boutons-icônes ronds. */
+    private static final double BUTTON_SIZE = 32;
+    /** Icône « fichier texte » (Material Design « description ») : ouvre server.xml dans l'éditeur. */
+    private static final String FILE_ICON = "M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"
+            + "m2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z";
+    /** Icônes « ajouter », « copier » et « supprimer » (Material Design). */
+    private static final String ADD_ICON = "M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"
+            + "m-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z";
+    /** Icônes du thème : soleil (clair), lune (sombre) et demi-disque (système), Material Design. */
+    private static final String THEME_LIGHT_ICON = "M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1"
+            + "s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1z"
+            + "M11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2"
+            + "c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06"
+            + "c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41"
+            + "l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41"
+            + "-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36"
+            + "c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z";
+    private static final String THEME_DARK_ICON = "M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36"
+            + "-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z";
+    private static final String THEME_SYSTEM_ICON = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
+            + "m0 18V4c4.42 0 8 3.58 8 8s-3.58 8-8 8z";
+    private static final String PREF_THEME = "theme";
+    private static final String COPY_ICON = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11"
+            + "c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z";
+    private static final String DELETE_ICON = "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z";
     /** Icône « modifier » (crayon, Material Design). */
     private static final String EDIT_ICON = "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"
             + "M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z";
+    /** Icônes « démarrer » (triangle) et « arrêter » (carré), Material Design. */
+    private static final String START_ICON = "M8 5v14l11-7z";
+    private static final String STOP_ICON = "M6 6h12v12H6z";
+    /** Icône « redémarrer » (flèche qui revient, Material Design « replay »). */
+    private static final String RESTART_ICON = "M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4"
+            + "c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z";
+    /** Délais au-delà desquels on cesse d'attendre le changement d'état demandé. */
+    private static final long START_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
+    private static final long STOP_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1);
+    /**
+     * Arrêt par Sysdeo : plus long, car Sysdeo perd l'ordre tant que Tomcat n'a pas fini de démarrer
+     * (plus d'une minute pour Areo). L'ordre est renvoyé toutes les ECLIPSE_STOP_RETRY_MS.
+     */
+    private static final long ECLIPSE_STOP_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(4);
+    private static final long ECLIPSE_STOP_RETRY_MS = TimeUnit.SECONDS.toMillis(10);
+    /** Durée pendant laquelle on réessaie d'envoyer la commande d'arrêt (port d'arrêt pas encore ouvert). */
+    private static final long SHUTDOWN_RETRY_MS = TimeUnit.SECONDS.toMillis(15);
 
     private final Preferences prefs = Preferences.userNodeForPackage(TomcatChooserApp.class);
     private final TextField pathField = new TextField();
     private final TableView<ContextEntry> table = new TableView<>();
-    private final Label status = new Label();
+    private final Label placeholder = new Label();
     private final TextField search = new TextField();
     private final Label tomcatState = new Label();
     private volatile TomcatStatus tomcatStatus;
@@ -83,9 +138,50 @@ public class TomcatChooserApp extends Application {
     private Stage stage;
     private Region header;
     private Region footer;
-    private Region footerStatus;
-    private final Button addButton = new Button("Ajouter");
-    private ServerXml serverXml;
+    private VBox listBox;
+    /** Thème de l'interface : celui du système, clair ou sombre (mémorisé). */
+    private enum Theme { SYSTEM, LIGHT, DARK }
+
+    private Theme theme = Theme.SYSTEM;
+    private final Button themeButton = iconButton(THEME_SYSTEM_ICON);
+    /** Sous le tableau : nombre de Context actifs. */
+    private final Label statusLabel = new Label();
+    private final Button addButton = iconButton(ADD_ICON);
+    private final Button duplicateButton = iconButton(COPY_ICON);
+    private final Button editButton = iconButton(EDIT_ICON);
+    private final Button deleteButton = iconButton(DELETE_ICON);
+    private final Button startStopButton = iconButton(START_ICON);
+    private final Button restartButton = iconButton(RESTART_ICON);
+    /** Redémarrage en cours : après l'arrêt, Tomcat est relancé. */
+    private boolean restarting;
+    /** Le port de débogage était ouvert au moment du redémarrage : on attend qu'il se libère avant de relancer. */
+    private volatile boolean waitDebugPort;
+    /**
+     * Eclipse pilote le Tomcat de ce server.xml (plugin MCP vogella + plugin Sysdeo) : démarrer, arrêter et
+     * redémarrer passent alors par Sysdeo, dans Eclipse. Null sinon (Eclipse fermé, plugin absent ou autre serveur).
+     */
+    private volatile EclipseMcp eclipse;
+    /** Dernière vérification « Sysdeo pilote ce server.xml » : refaite au plus toutes les 15 s. */
+    private long driveCheckedAt;
+    private boolean driveValue;
+    private Path driveCheckedFor;
+    /** L'opération en cours (démarrage, arrêt, redémarrage) a été confiée à Eclipse. */
+    private boolean viaEclipse;
+    /** Dernier client Eclipse connu : sert à finir une opération si Eclipse disparaît un instant de la détection. */
+    private volatile EclipseMcp lastEclipse;
+    /** Dernier envoi d'un ordre d'arrêt à Sysdeo, et nombre de mesures « arrêté » d'un redémarrage en cours. */
+    private long lastEclipseStop;
+    private int stoppedPolls;
+    /** État attendu après un clic sur Démarrer / Arrêter (null : aucune demande en cours) et sa limite. */
+    private TomcatStatus.State pendingState;
+    private long pendingDeadline;
+    private volatile ServerXml serverXml;
+    /** Rang d'affichage de chaque Context (par position dans le fichier), fixé à chaque tri. */
+    private int[] rankByIndex = new int[0];
+    /** La fenêtre a reçu sa taille (fixe) : elle ne change plus ensuite. */
+    private boolean sized;
+    /** Date de server.xml lors de la dernière lecture : un changement sur le disque déclenche une relecture. */
+    private FileTime lastModified;
 
     /**
      * server.xml proposé au premier lancement : C:\Tomcat70 sous Windows ; ailleurs, celui de
@@ -108,87 +204,161 @@ public class TomcatChooserApp extends Application {
     public void start(Stage stage) {
         this.stage = stage;
 
+        // Barre d'application.
+        Label title = new Label("Choisi ton projet");
+        title.getStyleClass().add("app-bar-title");
+        Region barSpace = new Region();
+        HBox.setHgrow(barSpace, Priority.ALWAYS);
+        // En haut à droite : le thème, clair, sombre ou celui du système (un clic passe au suivant).
+        themeButton.setOnAction(e -> {
+            theme = Theme.values()[(theme.ordinal() + 1) % Theme.values().length];
+            prefs.put(PREF_THEME, theme.name());
+            applyTheme();
+        });
+        HBox appBar = new HBox(title, barSpace, themeButton);
+        appBar.getStyleClass().add("app-bar");
+        appBar.setAlignment(Pos.CENTER_LEFT);
+
+        // Première carte : chemin (icônes à droite), état de Tomcat (boutons à droite) et actions sur les Context.
         Button browse = iconButton(FOLDER_ICON);
         browse.setOnAction(e -> chooseFile());
-        Button reload = iconButton(REFRESH_ICON);
-        reload.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
-        Button editFile = iconButton(EDIT_ICON);
+        Button editFile = iconButton(FILE_ICON);
         editFile.setOnAction(e -> openInSystemEditor(Paths.get(pathField.getText().trim())));
         pathField.setOnAction(e -> load(Paths.get(pathField.getText().trim())));
         pathField.setPromptText("Chemin du server.xml");
-        HBox icons = new HBox(4, browse, reload, editFile);
-        icons.setAlignment(Pos.CENTER_LEFT);
-        HBox top = new HBox(0, icons, pathField);
+        HBox.setHgrow(pathField, Priority.ALWAYS);
+        HBox top = new HBox(4, pathField, browse, editFile);
         top.setAlignment(Pos.CENTER_LEFT);
-        top.setPadding(new Insets(10, 11, 4, 11));
+
+        startStopButton.setOnAction(e -> startOrStopTomcat());
+        startStopButton.setVisible(false);
+        startStopButton.managedProperty().bind(startStopButton.visibleProperty());
+        restartButton.setOnAction(e -> restartTomcat());
+        restartButton.setVisible(false);
+        restartButton.managedProperty().bind(restartButton.visibleProperty());
+        // Largeur réservée au plus long libellé : la fenêtre, de taille fixe, ne le coupe jamais.
+        Text widest = new Text("Tomcat démarré (port 65535)");
+        widest.setFont(Font.font(Font.getDefault().getFamily(), FontWeight.BOLD, STATE_FONT_SIZE));
+        double stateWidth = Math.ceil(widest.getLayoutBounds().getWidth()) + 6;
+        tomcatState.setMinWidth(stateWidth);
+        tomcatState.setPrefWidth(stateWidth);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox tomcatRow = new HBox(4, tomcatState, spacer, startStopButton, restartButton);
+        tomcatRow.setAlignment(Pos.CENTER_LEFT);
+        // Hauteur réservée même sans bouton : la fenêtre ne saute pas quand ils apparaissent.
+        tomcatRow.setMinHeight(BUTTON_SIZE);
 
         search.setPromptText("Rechercher");
         search.textProperty().addListener((obs, old, text) -> {
             String q = text.trim().toLowerCase();
             filtered.setPredicate(c -> q.isEmpty() || c.displayPath().toLowerCase().contains(q));
+            updateCount();
+            fitWindowToRows();
         });
 
         buildTable();
-        // Le champ de recherche est placé au-dessus de la colonne Application, à sa largeur.
-        TableColumn<ContextEntry, ?> statusColumn = table.getColumns().get(0);
-        TableColumn<ContextEntry, ?> applicationColumn = table.getColumns().get(1);
-        Region statusSpace = new Region();
-        statusSpace.minWidthProperty().bind(statusColumn.widthProperty());
-        statusSpace.prefWidthProperty().bind(statusColumn.widthProperty());
-        search.minWidthProperty().bind(applicationColumn.widthProperty());
-        search.prefWidthProperty().bind(applicationColumn.widthProperty());
-        search.maxWidthProperty().bind(applicationColumn.widthProperty());
-        // Les icônes occupent la largeur de la colonne Statut : le chemin s'aligne sur la recherche.
-        icons.minWidthProperty().bind(statusColumn.widthProperty());
-        icons.prefWidthProperty().bind(statusColumn.widthProperty());
-        pathField.minWidthProperty().bind(applicationColumn.widthProperty());
-        pathField.prefWidthProperty().bind(applicationColumn.widthProperty());
-        pathField.maxWidthProperty().bind(applicationColumn.widthProperty());
-        HBox searchBar = new HBox(0, statusSpace, search);
-        searchBar.setAlignment(Pos.CENTER_LEFT);
-        // 1 px : bordure du tableau.
-        searchBar.setPadding(new Insets(0, 11, 8, 11));
 
-        status.setWrapText(true);
-        status.setMaxWidth(Double.MAX_VALUE);
-        // Le message ne décide pas de la largeur de la fenêtre : il passe à la ligne.
-        status.setMinWidth(0);
-        status.setPrefWidth(0);
-        HBox.setHgrow(status, Priority.ALWAYS);
-        HBox bottom = new HBox(FOOTER_SPACING, status, tomcatState);
-        bottom.setAlignment(Pos.CENTER_LEFT);
-        bottom.setPadding(new Insets(6, 10, 8, 10));
-
-        // Bouton Ajouter sous le tableau, aligné sur les boutons Actif / Inactif et de même taille.
+        // Boutons Ajouter, Dupliquer, Modifier et Supprimer (ces trois-là sur la ligne sélectionnée).
+        deleteButton.setGraphic(iconGraphic(DELETE_ICON, "icon-danger"));
         addButton.setOnAction(e -> addContext());
         addButton.setDisable(true);
-        addButton.setStyle("-fx-base: #1565c0; -fx-text-fill: white; -fx-font-weight: bold;");
-        addButton.minWidthProperty().bind(statusColumn.widthProperty().subtract(2 * CELL_PADDING));
-        addButton.prefWidthProperty().bind(statusColumn.widthProperty().subtract(2 * CELL_PADDING));
-        HBox addRow = new HBox(addButton);
-        addRow.setAlignment(Pos.CENTER_LEFT);
-        addRow.setPadding(new Insets(4, 11, 0, 11 + CELL_PADDING));
+        duplicateButton.setOnAction(e -> duplicateContext());
+        editButton.setOnAction(e -> edit(table.getSelectionModel().getSelectedItem()));
+        deleteButton.setOnAction(e -> deleteContext(table.getSelectionModel().getSelectedItem()));
+        for (Button b : new Button[] {duplicateButton, editButton, deleteButton}) {
+            b.disableProperty().bind(addButton.disableProperty()
+                    .or(table.getSelectionModel().selectedItemProperty().isNull()));
+        }
+        tip(themeButton, "");
+        tip(browse, "Choisir un autre server.xml");
+        tip(editFile, "Ouvrir server.xml dans l'éditeur");
+        tip(startStopButton, "Démarrer Tomcat");
+        tip(restartButton, "Redémarrer Tomcat");
+        tip(addButton, "Ajouter un Context");
+        tip(duplicateButton, "Dupliquer le Context sélectionné");
+        tip(editButton, "Modifier le Context sélectionné");
+        tip(deleteButton, "Supprimer le Context sélectionné");
+        HBox buttonRow = new HBox(8, addButton, duplicateButton, editButton, deleteButton);
+        buttonRow.setAlignment(Pos.CENTER);
 
-        header = new VBox(top, searchBar);
-        footerStatus = bottom;
-        footer = new VBox(addRow, bottom);
-        BorderPane root = new BorderPane(table, header, null, footer, null);
-        BorderPane.setMargin(table, new Insets(0, 10, 0, 10));
+        VBox card = new VBox(8, top, tomcatRow);
+        card.getStyleClass().add("card");
+        VBox.setMargin(card, new Insets(10, 10, 0, 10));
+
+        // Seconde carte, sous la première : la recherche et le tableau.
+        statusLabel.getStyleClass().add("status-label");
+        statusLabel.setMinHeight(16);
+        statusLabel.setPrefHeight(16);
+        tomcatState.getStyleClass().add("tomcat-state");
+        listBox = new VBox(8, buttonRow, search, table, statusLabel);
+        listBox.getStyleClass().add("card");
+        VBox.setVgrow(table, Priority.NEVER);
+        header = new VBox(appBar, card);
+        Region bottomSpace = new Region();
+        bottomSpace.setMinHeight(10);
+        bottomSpace.setPrefHeight(10);
+        footer = bottomSpace;
+        BorderPane root = new BorderPane(listBox, header, null, footer, null);
+        BorderPane.setMargin(listBox, new Insets(10, 10, 0, 10));
 
         stage.setTitle("Tomcat Chooser");
         for (int size : new int[] {16, 32, 48, 64, 128, 256}) {
             stage.getIcons().add(new Image(
                     TomcatChooserApp.class.getResourceAsStream("tomcat-" + size + ".png")));
         }
-        stage.setScene(new Scene(root));
-        // Taille fixe : la fenêtre s'ajuste seule au nombre de Context (voir fitWindowToRows).
+        Scene scene = new Scene(root);
+        scene.getStylesheets().add(Material.STYLESHEET);
+        stage.setScene(scene);
+        try {
+            theme = Theme.valueOf(prefs.get(PREF_THEME, Theme.SYSTEM.name()));
+        } catch (IllegalArgumentException unknown) {
+            theme = Theme.SYSTEM;
+        }
+        // Mode « système » : l'interface suit le thème de Windows, y compris quand il change en cours de route.
+        Platform.getPreferences().colorSchemeProperty().addListener((obs, old, scheme) -> {
+            if (theme == Theme.SYSTEM) {
+                applyTheme();
+            }
+        });
+        applyTheme();
+        // Taille fixe : calculée une fois pour MAX_ROWS lignes (voir fitWindowToRows).
         stage.setResizable(false);
         stage.show();
 
         String param = getParameters().getRaw().isEmpty() ? null : getParameters().getRaw().get(0);
         String last = param != null ? param : prefs.get(PREF_LAST_FILE, DEFAULT_SERVER_XML.toString());
         load(Paths.get(last));
-        startTomcatMonitor();
+        startMonitor();
+    }
+
+    /** Statut sous le tableau : nombre de Context actifs (et nombre affiché si une recherche filtre la liste). */
+    private void updateCount() {
+        long active = contexts.stream().filter(c -> !c.commented()).count();
+        int total = contexts.size();
+        String text = total == 0 ? "" : active + (active > 1 ? " actifs" : " actif") + " sur " + total;
+        if (total > 0 && filtered.size() != total) {
+            text += " · " + filtered.size() + (filtered.size() > 1 ? " affichés" : " affiché");
+        }
+        statusLabel.setText(text);
+    }
+
+    /** Applique le thème choisi : classe « dark » sur la racine, icône et infobulle du bouton. */
+    private void applyTheme() {
+        boolean dark = theme == Theme.DARK
+                || (theme == Theme.SYSTEM && Platform.getPreferences().getColorScheme() == ColorScheme.DARK);
+        Material.setDark(dark);
+        Parent root = stage.getScene().getRoot();
+        root.getStyleClass().remove(Material.DARK);
+        if (dark) {
+            root.getStyleClass().add(Material.DARK);
+        }
+        String icon = theme == Theme.LIGHT ? THEME_LIGHT_ICON : theme == Theme.DARK ? THEME_DARK_ICON : THEME_SYSTEM_ICON;
+        themeButton.setGraphic(iconGraphic(icon, "icon-on-primary"));
+        String next = theme == Theme.SYSTEM ? "clair" : theme == Theme.LIGHT ? "sombre" : "du système";
+        String now = theme == Theme.SYSTEM ? "du système (" + (dark ? "sombre" : "clair") + ")"
+                : theme == Theme.LIGHT ? "clair" : "sombre";
+        themeButton.getTooltip().setText("Thème " + now + " — cliquer pour passer au thème " + next);
     }
 
     /**
@@ -207,11 +377,15 @@ public class TomcatChooserApp extends Application {
         TableColumn<ContextEntry, ContextEntry> action = new TableColumn<>("Statut");
         action.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue()));
         action.setCellFactory(col -> new TableCell<>() {
-            private final Button button = new Button();
+            // Point vert (actif) ou rouge (inactif) ; un clic bascule vers l'autre état.
+            private final Circle dot = new Circle(DOT_RADIUS);
+            private final Button button = new Button(null, dot);
 
             {
-                button.setMaxWidth(Double.MAX_VALUE);
+                button.getStyleClass().add("dot-button");
                 button.setOnAction(e -> toggle(getItem()));
+                tip(button, "");
+                setAlignment(Pos.CENTER);
             }
 
             @Override
@@ -220,11 +394,11 @@ public class TomcatChooserApp extends Application {
                 if (empty || item == null) {
                     setGraphic(null);
                 } else {
-                    // Le bouton montre l'état ; un clic bascule vers l'autre état.
-                    button.setText(item.commented() ? "Inactif" : "Actif");
-                    button.setStyle(item.commented()
-                            ? "-fx-base: #e0e0e0; -fx-text-fill: #666666;"
-                            : "-fx-base: #2e7d32; -fx-text-fill: white; -fx-font-weight: bold;");
+                    dot.getStyleClass().removeAll("dot-active", "dot-inactive");
+                    dot.getStyleClass().add(item.commented() ? "dot-inactive" : "dot-active");
+                    button.getTooltip().setText(item.commented()
+                            ? "Inactif : cliquer pour activer (décommenter)"
+                            : "Actif : cliquer pour désactiver (commenter)");
                     setGraphic(button);
                 }
             }
@@ -233,13 +407,17 @@ public class TomcatChooserApp extends Application {
 
         // Colonnes redimensionnables à la souris, sans barre de défilement horizontale.
         action.setPrefWidth(STATUS_WIDTH);
-        action.setMinWidth(80);
+        action.setMinWidth(STATUS_WIDTH);
         application.setMinWidth(80);
-        application.setPrefWidth(200);
+        application.setPrefWidth(APPLICATION_WIDTH);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_SUBSEQUENT_COLUMNS);
 
+        // Les actifs d'abord, puis par ordre alphabétique (sans tenir compte de la casse).
+        application.setSortable(false);
         SortedList<ContextEntry> sorted = new SortedList<>(filtered);
-        sorted.comparatorProperty().bind(table.comparatorProperty());
+        sorted.setComparator(Comparator
+                .comparingInt((ContextEntry c) -> c.index() < rankByIndex.length ? rankByIndex[c.index()] : Integer.MAX_VALUE)
+                .thenComparingInt(ContextEntry::index));
         table.setItems(sorted);
         table.setRowFactory(tv -> {
             TableRow<ContextEntry> row = new TableRow<>();
@@ -254,25 +432,43 @@ public class TomcatChooserApp extends Application {
         table.getColumns().add(action);
         table.getColumns().add(application);
         table.setFixedCellSize(ROW_HEIGHT);
-        table.setPrefWidth(320);
-        // Pas de ligne de titres au-dessus des colonnes.
-        table.getStylesheets().add("data:text/css,"
-                + ".column-header-background { -fx-pref-height: 0; -fx-min-height: 0; -fx-max-height: 0; visibility: hidden; }");
-        table.setPlaceholder(new Label("Aucun <Context> trouvé dans ce fichier."));
+        table.setPrefWidth(STATUS_WIDTH + APPLICATION_WIDTH);
+        placeholder.setWrapText(true);
+        placeholder.setPadding(new Insets(0, 8, 0, 8));
+        table.setPlaceholder(placeholder);
+    }
+
+    /** Infobulle sur un bouton, au style Material (fond gris foncé, texte blanc). */
+    private static void tip(Button button, String text) {
+        Tooltip tooltip = new Tooltip(text);
+        tooltip.setStyle("-fx-background-color: #424242; -fx-text-fill: white; -fx-font-size: 11px;"
+                + " -fx-background-radius: 4; -fx-padding: 5 8 5 8;");
+        tooltip.setShowDelay(Duration.millis(350));
+        button.setTooltip(tooltip);
     }
 
     /** Bouton carré avec une icône bleue, toutes les icônes ramenées à la même taille. */
     private static Button iconButton(String svg) {
+        Button button = new Button(null, iconGraphic(svg));
+        button.getStyleClass().add("icon-button");
+        button.setMinSize(BUTTON_SIZE, BUTTON_SIZE);
+        button.setPrefSize(BUTTON_SIZE, BUTTON_SIZE);
+        button.setMaxSize(BUTTON_SIZE, BUTTON_SIZE);
+        return button;
+    }
+
+    private static Node iconGraphic(String svg) {
+        return iconGraphic(svg, "icon");
+    }
+
+    private static Node iconGraphic(String svg, String styleClass) {
         SVGPath path = new SVGPath();
         path.setContent(svg);
-        path.setStyle("-fx-fill: #1565c0;");
+        path.getStyleClass().add(styleClass);
         double scale = ICON_SIZE / Math.max(path.getLayoutBounds().getWidth(), path.getLayoutBounds().getHeight());
         path.setScaleX(scale);
         path.setScaleY(scale);
-        Button button = new Button(null, new Group(path));
-        button.setMinSize(32, 28);
-        button.setPrefSize(32, 28);
-        return button;
+        return new Group(path);
     }
 
     private static boolean isInsideButton(Object target) {
@@ -303,18 +499,17 @@ public class TomcatChooserApp extends Application {
         }
     }
 
-    /** Ouvre le fichier dans l'éditeur associé par le système (Bloc-notes à défaut). */
+    /** Ouvre le fichier dans l'éditeur du système (Bloc-notes à défaut) ; la liste suit seule ses modifications. */
     private void openInSystemEditor(Path file) {
         if (!Files.isRegularFile(file)) {
-            setStatus("Fichier introuvable : " + file, true);
+            showMessage("Fichier introuvable", file.toString());
             return;
         }
         Thread opener = new Thread(() -> {
             try {
                 openWithDesktop(file.toFile());
-                Platform.runLater(() -> setStatus("server.xml ouvert dans l'éditeur. Cliquez sur Recharger après l'avoir enregistré.", false));
             } catch (Exception ex) {
-                Platform.runLater(() -> setStatus("Impossible d'ouvrir l'éditeur : " + ex.getMessage(), true));
+                Platform.runLater(() -> showMessage("Impossible d'ouvrir l'éditeur", ex.getMessage()));
             }
         }, "editeur-systeme");
         opener.setDaemon(true);
@@ -347,26 +542,38 @@ public class TomcatChooserApp extends Application {
     private void load(Path file) {
         pathField.setText(file.toString());
         if (!Files.isRegularFile(file)) {
-            serverXml = null;
-            addButton.setDisable(true);
-            tomcatStatus = null;
-            contexts.clear();
-            setStatus("Fichier introuvable : " + file + ". Cliquez sur « Parcourir… » pour choisir un server.xml.", true);
+            unload("Fichier introuvable : " + file + ". Choisissez un server.xml avec l'icône dossier.");
             return;
         }
         try {
             serverXml = ServerXml.load(file);
+            lastModified = modifiedTime(file);
             addButton.setDisable(false);
             prefs.put(PREF_LAST_FILE, file.toString());
+            placeholder.setText("Aucun <Context> trouvé dans ce fichier.");
             refresh();
-            long active = serverXml.contexts().stream().filter(c -> !c.commented()).count();
-            setStatus(serverXml.contexts().size() + " Context trouvé(s), dont " + active + " actif(s).", false);
         } catch (Exception ex) {
-            serverXml = null;
-            addButton.setDisable(true);
-            tomcatStatus = null;
-            contexts.clear();
-            setStatus("Impossible de lire " + file + " : " + ex.getMessage(), true);
+            unload("Impossible de lire " + file + " : " + ex.getMessage());
+        }
+    }
+
+    /** Plus de fichier lu : liste vide, et la raison affichée à la place du tableau. */
+    private void unload(String reason) {
+        serverXml = null;
+        lastModified = null;
+        addButton.setDisable(true);
+        tomcatStatus = null;
+        contexts.clear();
+        updateCount();
+        placeholder.setText(reason);
+        fitWindowToRows();
+    }
+
+    private static FileTime modifiedTime(Path file) {
+        try {
+            return Files.getLastModifiedTime(file);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -376,10 +583,8 @@ public class TomcatChooserApp extends Application {
         }
         try {
             ContextEntry updated = serverXml.toggle(entry);
-            refresh();
+            refresh(false); // la ligne garde sa place : pas de nouveau tri
             select(updated);
-            setStatus("Context " + updated.displayPath() + (updated.commented() ? " désactivé (commenté)" : " activé (décommenté)")
-                    + ". Redémarrez Tomcat pour appliquer.", false);
         } catch (Exception ex) {
             showError(ex);
         }
@@ -392,11 +597,20 @@ public class TomcatChooserApp extends Application {
         } catch (Exception ignored) {
             // l'erreur principale est affichée ci-dessous
         }
-        setStatus(ex.getMessage(), true);
         Alert alert = new Alert(Alert.AlertType.ERROR, ex.getMessage());
+        Material.apply(alert);
         alert.setHeaderText("Modification impossible");
         alert.initOwner(stage);
         alert.showAndWait();
+    }
+
+    /** Message d'erreur sans bloquer : les erreurs de Tomcat arrivent pendant l'actualisation automatique. */
+    private void showMessage(String header, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, message);
+        Material.apply(alert);
+        alert.setHeaderText(header);
+        alert.initOwner(stage);
+        alert.show();
     }
 
     private void edit(ContextEntry entry) {
@@ -408,7 +622,7 @@ public class TomcatChooserApp extends Application {
             current.put(tag, serverXml.attributes(entry, tag));
         }
         Optional<Map<String, Map<String, String>>> result =
-                new ContextEditorDialog(stage, entry, current).showAndWait();
+                ContextEditorDialog.edit(stage, entry, current).showAndWait();
         if (result.isEmpty()) {
             return;
         }
@@ -421,33 +635,128 @@ public class TomcatChooserApp extends Application {
             ContextEntry updated = serverXml.updateTags(entry, changed);
             refresh();
             select(updated);
-            setStatus("Context " + updated.displayPath() + " modifié. Redémarrez Tomcat pour appliquer.", false);
         } catch (Exception ex) {
             showError(ex);
         }
     }
 
-    /** Ajoute un Context : fenêtre de saisie vide, puis insertion dans server.xml. */
+    /**
+     * Ajoute un Context avec exactement la même fenêtre que Modifier : path, reloadable, docBase, workDir, et un
+     * Loader prérempli comme celui déjà utilisé dans le fichier (vider son className pour ne pas en mettre).
+     * docBase et workDir sont préremplis d'après les derniers Context du fichier, et suivent le path saisi.
+     */
     private void addContext() {
         if (serverXml == null) {
             return;
         }
-        Map<String, String> blank = new LinkedHashMap<>();
-        blank.put("path", "");
-        blank.put("docBase", "");
-        blank.put("reloadable", "true");
+        Map<String, String> templates = docBaseTemplates();
+        Map<String, String> context = new LinkedHashMap<>();
+        context.put("path", "");
+        context.put("reloadable", "true");
+        context.put("docBase", templates.containsKey("docBase") ? ContextEditorDialog.fill(templates.get("docBase"), "") : "");
+        context.put("workDir", templates.containsKey("workDir") ? ContextEditorDialog.fill(templates.get("workDir"), "") : "");
         Map<String, Map<String, String>> byTag = new LinkedHashMap<>();
-        byTag.put("Context", blank);
+        byTag.put("Context", context);
+        serverXml.contexts().stream().map(c -> serverXml.attributes(c, "Loader")).filter(l -> l != null)
+                .findFirst().ifPresent(loader -> {
+                    // Un nouveau Context n'a besoin ni de debug ni de useSystemClassLoaderAsParent.
+                    Map<String, String> simple = new LinkedHashMap<>(loader);
+                    simple.remove("debug");
+                    simple.remove("useSystemClassLoaderAsParent");
+                    byTag.put("Loader", simple);
+                });
         Optional<Map<String, Map<String, String>>> result =
-                new ContextEditorDialog(stage, null, byTag).showAndWait();
+                ContextEditorDialog.add(stage, byTag, templates).showAndWait();
         if (result.isEmpty()) {
             return;
         }
         try {
-            ContextEntry added = serverXml.addContext(result.get().get("Context"));
+            ContextEntry added = serverXml.addContextTags(result.get());
             refresh();
             select(added);
-            setStatus("Context " + added.displayPath() + " ajouté. Redémarrez Tomcat pour appliquer.", false);
+        } catch (Exception ex) {
+            showError(ex);
+        }
+    }
+
+    /**
+     * Modèles de docBase et de workDir d'après les derniers Context du fichier : leur valeur, où le nom de
+     * l'application (le path sans « / », comme dossier) est remplacé par {@link ContextEditorDialog#NAME_MARK}.
+     */
+    private Map<String, String> docBaseTemplates() {
+        Map<String, String> templates = new LinkedHashMap<>();
+        java.util.List<ContextEntry> all = serverXml.contexts();
+        for (int i = all.size() - 1; i >= 0 && templates.size() < 2; i--) {
+            ContextEntry c = all.get(i);
+            String name = c.path().startsWith("/") ? c.path().substring(1) : c.path();
+            if (name.isEmpty()) {
+                continue;
+            }
+            Map<String, String> attrs = serverXml.attributes(c, "Context");
+            for (String key : new String[] {"docBase", "workDir"}) {
+                String value = attrs == null ? null : attrs.get(key);
+                if (value == null || templates.containsKey(key)) {
+                    continue;
+                }
+                java.util.regex.Matcher m = java.util.regex.Pattern
+                        .compile("(^|[\\\\/])" + java.util.regex.Pattern.quote(name) + "([\\\\/]|$)",
+                                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(value);
+                if (m.find()) {
+                    templates.put(key, value.substring(0, m.start()) + m.group(1) + ContextEditorDialog.NAME_MARK
+                            + m.group(2) + value.substring(m.end()));
+                }
+            }
+        }
+        return templates;
+    }
+
+    /** Supprime le Context sélectionné de server.xml, après confirmation. */
+    private void deleteContext(ContextEntry entry) {
+        if (serverXml == null || entry == null) {
+            return;
+        }
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Il sera retiré de " + serverXml.file().toAbsolutePath().normalize() + ".",
+                ButtonType.OK, ButtonType.CANCEL);
+        Material.apply(confirm);
+        confirm.setTitle("Supprimer");
+        confirm.setHeaderText("Supprimer le Context " + entry.displayPath() + " ?");
+        ((Button) confirm.getDialogPane().lookupButton(ButtonType.OK)).setText("Supprimer");
+        ((Button) confirm.getDialogPane().lookupButton(ButtonType.CANCEL)).setText("Annuler");
+        confirm.initOwner(stage);
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
+            return;
+        }
+        try {
+            serverXml.deleteContext(entry);
+            refresh();
+        } catch (Exception ex) {
+            showError(ex);
+        }
+    }
+
+    /** Duplique le Context sélectionné : fenêtre préremplie (path suffixé « _copie »), puis insertion active. */
+    private void duplicateContext() {
+        ContextEntry source = table.getSelectionModel().getSelectedItem();
+        if (serverXml == null || source == null) {
+            return;
+        }
+        Map<String, Map<String, String>> byTag = new LinkedHashMap<>();
+        for (String tag : ServerXml.EDITABLE_TAGS) {
+            byTag.put(tag, serverXml.attributes(source, tag));
+        }
+        Map<String, String> context = new LinkedHashMap<>(byTag.get("Context"));
+        context.put("path", (source.path().isEmpty() ? "/ROOT" : source.path()) + "_copie");
+        byTag.put("Context", context);
+        Optional<Map<String, Map<String, String>>> result =
+                ContextEditorDialog.duplicate(stage, source, byTag).showAndWait();
+        if (result.isEmpty()) {
+            return;
+        }
+        try {
+            ContextEntry added = serverXml.duplicateContext(source, result.get());
+            refresh();
+            select(added);
         } catch (Exception ex) {
             showError(ex);
         }
@@ -458,44 +767,313 @@ public class TomcatChooserApp extends Application {
                 .ifPresent(c -> table.getSelectionModel().select(c));
     }
 
-    /** Vérifie toutes les 3 s si Tomcat tourne (ports de server.xml) et met à jour le voyant. */
-    private void startTomcatMonitor() {
-        // Le voyant change de largeur : le message voisin peut changer de nombre de lignes.
-        tomcatState.textProperty().addListener((obs, old, text) -> fitWindowToRows());
-        tomcatState.setMinWidth(Region.USE_PREF_SIZE);
+    /**
+     * Toutes les 3 s : vérifie si Tomcat tourne (port HTTP de server.xml) et relit server.xml
+     * s'il a changé sur le disque (modifié à la main ou par un autre outil).
+     */
+    private void startMonitor() {
         ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "tomcat-status");
+            Thread t = new Thread(r, "actualisation");
             t.setDaemon(true);
             return t;
         });
         monitor.scheduleWithFixedDelay(() -> {
+            ServerXml xml = serverXml;
+            FileTime modified = xml == null ? null : modifiedTime(xml.file());
             TomcatStatus status = tomcatStatus;
             TomcatStatus.State state = status == null ? null : status.check();
-            Platform.runLater(() -> showTomcatState(status, state));
+            eclipse = detectEclipse(xml);
+            if (eclipse != null) {
+                lastEclipse = eclipse;
+            }
+            Platform.runLater(() -> {
+                reloadIfChanged(xml, modified);
+                showTomcatState(tomcatStatus, tomcatStatus == status ? state : null);
+            });
         }, 0, 3, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Le client d'Eclipse si le plugin MCP répond et que le plugin Sysdeo pilote le Tomcat de ce server.xml ;
+     * null sinon. Appelé par le moniteur, hors du thread JavaFX.
+     */
+    private EclipseMcp detectEclipse(ServerXml xml) {
+        EclipseMcp mcp = EclipseMcp.connect();
+        if (mcp == null || xml == null) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        if (!xml.file().equals(driveCheckedFor) || now - driveCheckedAt > 15_000) {
+            try {
+                driveValue = mcp.drives(xml.file());
+            } catch (Exception e) {
+                driveValue = false;
+            }
+            driveCheckedFor = xml.file();
+            driveCheckedAt = now;
+        }
+        return driveValue ? mcp : null;
+    }
+
+    /** Relit server.xml s'il a changé sur le disque, en gardant la ligne sélectionnée et la recherche. */
+    private void reloadIfChanged(ServerXml xml, FileTime modified) {
+        if (xml == null || xml != serverXml || modified == null || modified.equals(lastModified)) {
+            return;
+        }
+        lastModified = modified;
+        try {
+            String before = xml.text();
+            xml.reload();
+            if (!before.equals(xml.text())) {
+                ContextEntry selected = table.getSelectionModel().getSelectedItem();
+                refresh();
+                if (selected != null) {
+                    contexts.stream()
+                            .filter(c -> c.path().equals(selected.path()))
+                            .min((a, b) -> Integer.compare(Math.abs(a.index() - selected.index()),
+                                    Math.abs(b.index() - selected.index())))
+                            .ifPresent(this::select);
+                }
+            }
+        } catch (Exception ignored) {
+            // Fichier en cours d'écriture ou momentanément illisible : nouvel essai dans 3 s.
+            lastModified = null;
+        }
     }
 
     private void showTomcatState(TomcatStatus status, TomcatStatus.State state) {
         if (status == null) {
             tomcatState.setText("");
+            startStopButton.setVisible(false);
+            restartButton.setVisible(false);
+            return;
+        }
+        if (state == null) {
+            // Le server.xml vient de changer : l'état sera mesuré au prochain passage.
             return;
         }
         boolean started = state == TomcatStatus.State.STARTED;
+        long now = System.currentTimeMillis();
+        if (viaEclipse && pendingState == TomcatStatus.State.STOPPED && started
+                && now - lastEclipseStop > ECLIPSE_STOP_RETRY_MS && now <= pendingDeadline) {
+            // Tomcat répond encore : Sysdeo perd l'ordre d'arrêt tant que Tomcat n'a pas fini de démarrer
+            // (son port d'arrêt est alors fermé). On le redemande jusqu'à ce que Tomcat s'arrête.
+            lastEclipseStop = now;
+            sendToEclipse(EclipseMcp.SYSDEO_STOP, status, TomcatStatus.State.STARTED);
+        }
+        if (restarting && pendingState == TomcatStatus.State.STOPPED && state == TomcatStatus.State.STOPPED
+                && now <= pendingDeadline) {
+            if (viaEclipse) {
+                // Arrêté : on laisse un instant à l'ancienne JVM pour se terminer, puis Sysdeo redémarre Tomcat.
+                if (++stoppedPolls >= 2) {
+                    stoppedPolls = 0;
+                    pendingState = TomcatStatus.State.STARTED;
+                    pendingDeadline = now + START_TIMEOUT_MS;
+                    sendToEclipse(EclipseMcp.SYSDEO_START, status, TomcatStatus.State.STOPPED);
+                }
+            } else if (!waitDebugPort || !TomcatStatus.isListening(TomcatLauncher.DEBUG_PORT)) {
+                // Arrêté : on relance, une fois le port de débogage libéré par l'ancienne JVM.
+                try {
+                    TomcatLauncher.start(serverXml.file());
+                    pendingState = TomcatStatus.State.STARTED;
+                    pendingDeadline = System.currentTimeMillis() + START_TIMEOUT_MS;
+                } catch (Exception ex) {
+                    pendingState = null;
+                    restarting = false;
+                    showMessage("Tomcat est arrêté mais n'a pas pu être relancé", ex.getMessage());
+                }
+            }
+        } else if (pendingState != null && (state == pendingState || System.currentTimeMillis() > pendingDeadline)) {
+            if (state != pendingState) {
+                showMessage(pendingState == TomcatStatus.State.STARTED ? "Tomcat n'a pas démarré" : "Tomcat ne s'est pas arrêté",
+                        pendingState == TomcatStatus.State.STARTED ? "Voyez sa console ou ses logs." : "Arrêtez-le depuis sa console.");
+            } else if (restarting && state == TomcatStatus.State.STOPPED && !viaEclipse) {
+                showMessage("Tomcat est arrêté mais n'a pas été relancé",
+                        "Le port " + TomcatLauncher.DEBUG_PORT + " reste occupé : relancez-le avec ▶.");
+            }
+            pendingState = null;
+            restarting = false;
+            viaEclipse = false;
+        }
+        boolean viaPlugin = eclipse != null;
+        boolean canStart = serverXml != null && (viaPlugin || TomcatLauncher.catalinaHome(serverXml.file()) != null);
+        startStopButton.setVisible(serverXml != null && (started || canStart));
+        startStopButton.setDisable(pendingState != null);
+        startStopButton.setGraphic(iconGraphic(started ? STOP_ICON : START_ICON));
+        startStopButton.getTooltip().setText(viaPlugin
+                ? (started ? "Arrêter Tomcat avec Sysdeo (dans Eclipse)" : "Démarrer Tomcat avec Sysdeo (dans Eclipse)")
+                : (started ? "Arrêter Tomcat" : "Démarrer Tomcat (débogage sur le port " + TomcatLauncher.DEBUG_PORT + ")"));
+        restartButton.getTooltip().setText(viaPlugin ? "Redémarrer Tomcat avec Sysdeo (dans Eclipse)"
+                : "Redémarrer Tomcat (relancé hors d'Eclipse)");
+        restartButton.setVisible(canStart && (started || restarting));
+        restartButton.setDisable(pendingState != null);
+        if (pendingState != null) {
+            tomcatState.setText(restarting ? "Redémarrage…"
+                    : pendingState == TomcatStatus.State.STARTED ? "Démarrage…" : "Arrêt…");
+            setStateKind("pending");
+            return;
+        }
         String port = status.httpPort() > 0 ? " (port " + status.httpPort() + ")" : "";
-        tomcatState.setText((started ? "● Tomcat démarré" : "● Tomcat arrêté") + port);
-        tomcatState.setStyle(started
-                ? "-fx-text-fill: #2e7d32; -fx-font-weight: bold;"
-                : "-fx-text-fill: #c62828;");
+        tomcatState.setText((started ? "Tomcat démarré" : "Tomcat arrêté") + port);
+        setStateKind(started ? "started" : "stopped");
+    }
+
+    /** Couleur du texte d'état de Tomcat (classe CSS : started, stopped ou pending), selon le thème. */
+    private void setStateKind(String kind) {
+        tomcatState.getStyleClass().removeAll("started", "stopped", "pending");
+        tomcatState.getStyleClass().add(kind);
+    }
+
+    /**
+     * Démarre Tomcat (catalina jpda start, débogable depuis Eclipse sur le port 8000) ou l'arrête
+     * (commande d'arrêt sur le port de server.xml), selon le voyant.
+     */
+    private void startOrStopTomcat() {
+        TomcatStatus status = tomcatStatus;
+        if (status == null || serverXml == null || pendingState != null) {
+            return;
+        }
+        boolean started = status.check() == TomcatStatus.State.STARTED;
+        if (eclipse != null) {
+            // Via Eclipse : le plugin Sysdeo démarre ou arrête le Tomcat, dans la console et le débogueur d'Eclipse.
+            runInEclipse(started ? EclipseMcp.SYSDEO_STOP : EclipseMcp.SYSDEO_START,
+                    started ? TomcatStatus.State.STOPPED : TomcatStatus.State.STARTED, false);
+            return;
+        }
+        if (started) {
+            requestShutdown(status, false);
+            return;
+        }
+        try {
+            TomcatLauncher.start(serverXml.file());
+            pendingState = TomcatStatus.State.STARTED;
+            pendingDeadline = System.currentTimeMillis() + START_TIMEOUT_MS;
+            showTomcatState(status, TomcatStatus.State.STOPPED);
+        } catch (Exception ex) {
+            showMessage("Démarrage impossible", ex.getMessage());
+        }
+    }
+
+    /**
+     * Redémarre Tomcat : commande d'arrêt, attente de l'arrêt complet, puis catalina jpda start.
+     * Un Tomcat lancé depuis Eclipse est donc relancé hors d'Eclipse (débogable sur le port 8000).
+     */
+    private void restartTomcat() {
+        TomcatStatus status = tomcatStatus;
+        if (status == null || serverXml == null || pendingState != null) {
+            return;
+        }
+        if (eclipse != null) {
+            // Arrêt, puis démarrage, par Sysdeo : la commande « Redémarrer » de Sysdeo perd elle aussi son ordre
+            // d'arrêt si Tomcat finit de démarrer, alors qu'ici l'arrêt est réessayé jusqu'à ce qu'il aboutisse.
+            runInEclipse(EclipseMcp.SYSDEO_STOP, TomcatStatus.State.STOPPED, true);
+            return;
+        }
+        requestShutdown(status, true);
+    }
+
+    /**
+     * Confie une commande Sysdeo (démarrer, arrêter, redémarrer) à Eclipse, par le plugin MCP, hors du thread
+     * JavaFX. Le voyant passe en orange jusqu'à ce que Tomcat atteigne l'état attendu.
+     */
+    private void runInEclipse(String command, TomcatStatus.State expected, boolean restart) {
+        TomcatStatus status = tomcatStatus;
+        viaEclipse = true;
+        restarting = restart;
+        stoppedPolls = 0;
+        pendingState = expected;
+        pendingDeadline = System.currentTimeMillis()
+                + (expected == TomcatStatus.State.STARTED ? START_TIMEOUT_MS : ECLIPSE_STOP_TIMEOUT_MS);
+        TomcatStatus.State before = expected == TomcatStatus.State.STARTED
+                ? TomcatStatus.State.STOPPED : TomcatStatus.State.STARTED;
+        lastEclipseStop = System.currentTimeMillis();
+        showTomcatState(status, before);
+        sendToEclipse(command, status, before);
+    }
+
+    /** Envoie la commande à Eclipse hors du thread JavaFX ; en cas d'échec, abandonne l'opération et prévient. */
+    private void sendToEclipse(String command, TomcatStatus status, TomcatStatus.State stateOnError) {
+        EclipseMcp mcp = eclipse;
+        if (mcp == null) {
+            mcp = lastEclipse;
+        }
+        EclipseMcp target = mcp;
+        Thread sender = new Thread(() -> {
+            try {
+                target.runCommand(command);
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    pendingState = null;
+                    restarting = false;
+                    viaEclipse = false;
+                    showMessage("Eclipse n'a pas pu exécuter la commande", ex.getMessage());
+                    showTomcatState(status, stateOnError);
+                });
+            }
+        }, "eclipse-sysdeo");
+        sender.setDaemon(true);
+        sender.start();
+    }
+
+    /**
+     * Envoie la commande d'arrêt hors du thread JavaFX : juste après le démarrage, Tomcat peut
+     * répondre en HTTP avant d'ouvrir son port d'arrêt, d'où quelques secondes de nouvelles tentatives.
+     */
+    private void requestShutdown(TomcatStatus status, boolean restart) {
+        restarting = restart;
+        pendingState = TomcatStatus.State.STOPPED;
+        pendingDeadline = System.currentTimeMillis() + STOP_TIMEOUT_MS;
+        showTomcatState(status, TomcatStatus.State.STARTED);
+        Thread sender = new Thread(() -> {
+            try {
+                waitDebugPort = restart && TomcatStatus.isListening(TomcatLauncher.DEBUG_PORT);
+                status.shutdown(SHUTDOWN_RETRY_MS);
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    pendingState = null;
+                    restarting = false;
+                    showMessage((restart ? "Redémarrage" : "Arrêt") + " impossible", ex.getMessage());
+                    showTomcatState(status, TomcatStatus.State.STARTED);
+                });
+            }
+        }, "tomcat-arret");
+        sender.setDaemon(true);
+        sender.start();
     }
 
     private void refresh() {
+        refresh(true);
+    }
+
+    /**
+     * Met à jour la liste depuis server.xml. Avec resort, l'ordre est recalculé : actifs d'abord, puis
+     * alphabétique. Sans, les lignes gardent leur place (activer ou désactiver un Context ne la change pas).
+     */
+    private void refresh(boolean resort) {
         tomcatStatus = TomcatStatus.fromServerXml(serverXml.text());
-        contexts.setAll(serverXml.contexts());
+        lastModified = modifiedTime(serverXml.file());
+        java.util.List<ContextEntry> all = serverXml.contexts();
+        if (resort || rankByIndex.length != all.size()) {
+            java.util.List<ContextEntry> ordered = new java.util.ArrayList<>(all);
+            ordered.sort(Comparator.comparing(ContextEntry::commented)
+                    .thenComparing(ContextEntry::displayPath, String.CASE_INSENSITIVE_ORDER)
+                    .thenComparingInt(ContextEntry::index));
+            int[] ranks = new int[all.size()];
+            for (int i = 0; i < ordered.size(); i++) {
+                ranks[ordered.get(i).index()] = i;
+            }
+            rankByIndex = ranks;
+        }
+        contexts.setAll(all);
+        updateCount();
         table.refresh();
         fitWindowToRows();
     }
 
-    /** Ajuste la fenêtre pour afficher exactement toutes les lignes, sans dépasser l'écran. */
+    /**
+     * Ajuste la fenêtre pour afficher exactement les lignes de la liste (après filtre), sans ligne vide
+     * ni barre de défilement, tant que l'écran le permet.
+     */
     private void fitWindowToRows() {
         if (header == null || stage.getScene() == null) {
             return;
@@ -505,18 +1083,24 @@ public class TomcatChooserApp extends Application {
         Node columnHeader = table.lookup(".column-header-background");
         double headerHeight = columnHeader == null ? 0 : columnHeader.prefHeight(-1);
         double borders = table.getInsets().getTop() + table.getInsets().getBottom();
-        int rows = Math.max(1, contexts.size());
+        // Taille fixe, calculée une seule fois : MAX_ROWS lignes visibles, au-delà la liste a son ascenseur.
+        if (sized) {
+            return;
+        }
+        sized = true;
+        int rows = MAX_ROWS;
         double tableHeight = headerHeight + rows * ROW_HEIGHT + borders;
 
-        // Hauteurs du haut et du bas calculées à la largeur réelle : le message du bas peut
-        // tenir sur plusieurs lignes, ce que la taille « préférée » par défaut ignore.
         double width = root.prefWidth(-1);
-        Insets pad = footerStatus.getInsets();
-        double statusWidth = width - pad.getLeft() - pad.getRight() - tomcatState.prefWidth(-1) - FOOTER_SPACING;
-        double footerHeight = ((VBox) footer).getChildren().get(0).prefHeight(width)
-                + pad.getTop() + pad.getBottom()
-                + Math.max(status.prefHeight(statusWidth), tomcatState.prefHeight(-1));
-        double others = header.prefHeight(width) + footerHeight;
+        // Hors tableau : marge et marges de la carte du bas, et ce qui l'entoure (boutons, recherche, statut).
+        double listBoxExtra = listBox.getInsets().getTop() + listBox.getInsets().getBottom()
+                + BorderPane.getMargin(listBox).getTop() + (listBox.getChildren().size() - 1) * listBox.getSpacing();
+        for (Node child : listBox.getChildren()) {
+            if (child != table) {
+                listBoxExtra += child.prefHeight(-1);
+            }
+        }
+        double others = header.prefHeight(width) + footer.prefHeight(width) + listBoxExtra;
 
         Rectangle2D screen = Screen.getScreensForRectangle(stage.getX(), stage.getY(), 1, 1).stream()
                 .findFirst().orElse(Screen.getPrimary()).getVisualBounds();
@@ -529,6 +1113,7 @@ public class TomcatChooserApp extends Application {
         }
         table.setPrefHeight(tableHeight);
         table.setMinHeight(tableHeight);
+        table.setMaxHeight(tableHeight);
         ((Region) root).setPrefHeight(others + tableHeight);
         stage.sizeToScene();
         if (stage.getWidth() > screen.getWidth()) {
@@ -541,12 +1126,5 @@ public class TomcatChooserApp extends Application {
         if (stage.getX() + stage.getWidth() > screen.getMaxX()) {
             stage.setX(Math.max(screen.getMinX(), screen.getMaxX() - stage.getWidth()));
         }
-    }
-
-    private void setStatus(String message, boolean error) {
-        status.setText(message);
-        status.setStyle(error ? "-fx-text-fill: #c62828;" : "");
-        // Un message plus long peut prendre une ligne de plus : la fenêtre suit.
-        fitWindowToRows();
     }
 }

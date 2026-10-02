@@ -11,9 +11,6 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Maven 4 : masque l'avertissement « Plugin is modifying testCompileSourceRoots through add() »
-             émis pour des plugins encore écrits pour Maven 3 (sans effet sur le build). -->
-        <maven.project.sourceRoots.warningsDisabled>true</maven.project.sourceRoots.warningsDisabled>
         <maven.compiler.release>25</maven.compiler.release>
         <!-- Version de l'exe ; le workflow de release la remplace par celle du tag (v1.2.3 -> 1.2.3). -->
         <app.version>${project.version}</app.version>
@@ -38,11 +35,15 @@
 
     <build>
         <plugins>
-            <!-- Versions figées : Maven 4 le recommande et évite les avertissements -->
+            <!-- Versions figées : builds reproductibles, sans avertissement de Maven sur les versions manquantes -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-clean-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>3.5.0</version>
+                <configuration>
+                    <!-- jpackage crée TomcatChooser.exe en lecture seule : sans cela, clean ne peut pas le supprimer -->
+                    <force>true</force>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

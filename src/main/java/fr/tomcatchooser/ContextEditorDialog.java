@@ -1,19 +1,20 @@
 package fr.tomcatchooser;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Control;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TitledPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -22,59 +23,140 @@ import javafx.scene.text.Text;
 import javafx.stage.Window;
 
 /**
- * Fenêtre de modification d'un {@code <Context>} : ses attributs, et ceux de son élément Loader.
+ * Fenêtre de modification d'un {@code <Context>} : ses attributs, puis ceux de son élément Loader.
+ * Les valeurs true/false sont des pastilles, placées sur la ligne du champ qui les précède.
  * Le résultat associe chaque balise présente à ses nouveaux attributs.
+ * <p>
+ * L'ajout d'un Context utilise exactement cette fenêtre, avec des champs vides ou préremplis.
  */
 final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>> {
 
+    /** Largeur de la zone de saisie. */
+    private static final double CONTENT_WIDTH = 550;
+    /** Marque, dans un modèle de docBase / workDir, la place du nom de l'application. */
+    static final String NAME_MARK = "{nom}";
 
-    private final Map<String, AttributeEditor> editors = new LinkedHashMap<>();
+    /** Attributs modifiables, par balise, dans l'ordre d'affichage. */
+    private final Map<String, List<Attribute>> attributesByTag = new LinkedHashMap<>();
+
+    /** Un attribut et son champ de saisie (texte ou pastille true/false). Pas de record, comme ContextEntry. */
+    private static final class Attribute {
+        private final String name;
+        private final Control field;
+
+        Attribute(String name, Control field) {
+            this.name = name;
+            this.field = field;
+        }
+
+        String name() {
+            return name;
+        }
+
+        Control field() {
+            return field;
+        }
+    }
+
+    /** Modification du Context donné. */
+    static ContextEditorDialog edit(Window owner, ContextEntry entry, Map<String, Map<String, String>> byTag) {
+        return new ContextEditorDialog(owner,
+                "Application : " + entry.displayPath() + (entry.commented() ? "   (inactif)" : "   (actif)"),
+                "Enregistrer", byTag, Map.of());
+    }
 
     /**
-     * @param entry Context modifié, ou null pour en ajouter un
-     * @param byTag attributs par balise ; une valeur null signifie que la balise est absente.
+     * Nouveau Context : la même fenêtre que la modification. Pendant la saisie du path, les champs dont un
+     * modèle est fourni (clé = attribut, valeur contenant {@link #NAME_MARK}) suivent le nom saisi,
+     * tant qu'ils n'ont pas été modifiés à la main.
      */
-    ContextEditorDialog(Window owner, ContextEntry entry, Map<String, Map<String, String>> byTag) {
+    static ContextEditorDialog add(Window owner, Map<String, Map<String, String>> byTag, Map<String, String> templates) {
+        return new ContextEditorDialog(owner, "Application : nouvelle   (actif)", "Enregistrer", byTag, templates);
+    }
+
+    /** Copie du Context donné, avec ses éléments enfants ; la copie est créée active. */
+    static ContextEditorDialog duplicate(Window owner, ContextEntry entry, Map<String, Map<String, String>> byTag) {
+        return new ContextEditorDialog(owner,
+                "Copie de " + entry.displayPath() + "   (la copie sera active)", "Dupliquer", byTag, Map.of());
+    }
+
+    /** Valeur d'un modèle pour un nom d'application (sans « / »). Vide : le séparateur en trop est retiré. */
+    static String fill(String template, String name) {
+        int at = template.indexOf(NAME_MARK);
+        if (at < 0) {
+            return template;
+        }
+        String before = template.substring(0, at);
+        String after = template.substring(at + NAME_MARK.length());
+        if (name.isEmpty() && !before.isEmpty() && !after.isEmpty()
+                && "\\/".indexOf(before.charAt(before.length() - 1)) >= 0 && "\\/".indexOf(after.charAt(0)) >= 0) {
+            after = after.substring(1);
+        }
+        return before + name + after;
+    }
+
+    /** @param byTag attributs par balise ; une valeur null signifie que la balise est absente. */
+    private ContextEditorDialog(Window owner, String header, String okText,
+                                Map<String, Map<String, String>> byTag, Map<String, String> templates) {
         initOwner(owner);
-        if (entry == null) {
-            // Nouveau Context : path vide = application ROOT, le « / » initial est ajouté si absent.
-            setTitle("Ajouter un Context");
-            setHeaderText("Nouvelle application (path sans « / », docBase obligatoire)");
-        } else {
-            setTitle("Modifier le Context");
-            setHeaderText("Application : " + entry.displayPath() + (entry.commented() ? "   (inactif)" : "   (actif)"));
-        }
+        setTitle("Context");
+        setHeaderText(header);
         setResizable(true);
+        Material.apply(this);
 
-        VBox sections = new VBox(10);
-        sections.setPadding(new Insets(12, 16, 12, 12));
+        // Une seule colonne de noms pour toutes les balises : les champs sont alignés.
+        double nameWidth = byTag.values().stream().filter(a -> a != null)
+                .flatMap(a -> a.entrySet().stream()).filter(e -> !isBoolean(e.getValue()))
+                .mapToDouble(e -> new Text(e.getKey()).getLayoutBounds().getWidth()).max().orElse(60) + 12;
+
+        VBox rows = new VBox(8);
+        rows.setPadding(new Insets(14, 16, 8, 16));
         byTag.forEach((tag, attributes) -> {
-            Node body;
-            if (attributes == null) {
-                Label none = new Label("Aucun <" + tag + "> dans ce Context.");
-                none.setStyle("-fx-text-fill: #888888;");
-                body = none;
-            } else {
-                AttributeEditor editor = new AttributeEditor(attributes, nameWidth(attributes));
-                editors.put(tag, editor);
-                body = editor;
+            if (attributes == null || attributes.isEmpty()) {
+                return;
             }
-            TitledPane pane = new TitledPane(tag, body);
-            sections.getChildren().add(pane);
+            if (!rows.getChildren().isEmpty()) {
+                // Pas de cadre : un simple trait et le nom de la balise séparent ses attributs.
+                Label caption = new Label(tag);
+                caption.getStyleClass().add("section-caption");
+                rows.getChildren().addAll(new Separator(), caption);
+            }
+            List<Attribute> list = new ArrayList<>();
+            attributesByTag.put(tag, list);
+            HBox previous = null;
+            for (Map.Entry<String, String> e : attributes.entrySet()) {
+                Label label = new Label(e.getKey());
+                label.getStyleClass().add("attribute-name");
+                if (isBoolean(e.getValue())) {
+                    ToggleButton toggle = booleanButton(e.getValue());
+                    list.add(new Attribute(e.getKey(), toggle));
+                    if (previous != null) {
+                        // true/false sur la ligne du champ précédent.
+                        previous.getChildren().addAll(label, toggle);
+                        continue;
+                    }
+                    label.setMinWidth(nameWidth);
+                    label.setPrefWidth(nameWidth);
+                    previous = new HBox(6, label, toggle);
+                } else {
+                    TextField field = new TextField(e.getValue());
+                    HBox.setHgrow(field, Priority.ALWAYS);
+                    list.add(new Attribute(e.getKey(), field));
+                    label.setMinWidth(nameWidth);
+                    label.setPrefWidth(nameWidth);
+                    previous = new HBox(6, label, field);
+                }
+                previous.setAlignment(Pos.CENTER_LEFT);
+                rows.getChildren().add(previous);
+            }
         });
+        autoFill(attributesByTag.get("Context"), templates);
 
-        ScrollPane scroll = new ScrollPane(sections);
-        scroll.setFitToWidth(true);
-        // Hauteur estimée d'après le contenu (pas de grand vide pour un Context seul), au plus 330.
-        double estimate = 24;
-        for (Map<String, String> attributes : byTag.values()) {
-            estimate += 26 + 16 + (attributes == null ? 20 : attributes.size() * 31) + 10;
-        }
-        scroll.setPrefViewportHeight(Math.min(330, estimate));
-        scroll.setPrefViewportWidth(820);
-        getDialogPane().setContent(scroll);
+        // Pas de zone défilante : la fenêtre prend la hauteur de ses quelques attributs.
+        rows.setPrefWidth(CONTENT_WIDTH);
+        getDialogPane().setContent(rows);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        ((Button) getDialogPane().lookupButton(ButtonType.OK)).setText(entry == null ? "Ajouter" : "Enregistrer");
+        ((Button) getDialogPane().lookupButton(ButtonType.OK)).setText(okText);
         ((Button) getDialogPane().lookupButton(ButtonType.CANCEL)).setText("Annuler");
 
         setResultConverter(button -> {
@@ -82,87 +164,71 @@ final class ContextEditorDialog extends Dialog<Map<String, Map<String, String>>>
                 return null;
             }
             Map<String, Map<String, String>> result = new LinkedHashMap<>();
-            editors.forEach((tag, editor) -> result.put(tag, editor.values()));
+            attributesByTag.forEach((tag, list) -> {
+                Map<String, String> values = new LinkedHashMap<>();
+                for (Attribute a : list) {
+                    values.put(a.name(), a.field() instanceof ToggleButton t ? booleanValue(t) : ((TextField) a.field()).getText());
+                }
+                result.put(tag, values);
+            });
             return result;
         });
     }
 
-    /** Colonne des noms juste assez large pour le plus long de la section : les champs commencent au plus à gauche. */
-    private static double nameWidth(Map<String, String> attributes) {
-        return attributes.keySet().stream()
-                .mapToDouble(name -> new Text(name).getLayoutBounds().getWidth()).max().orElse(60) + 16;
+    /** Fait suivre le path aux champs qui ont un modèle (docBase, workDir…), tant qu'on n'y a pas touché. */
+    private static void autoFill(List<Attribute> context, Map<String, String> templates) {
+        if (context == null || templates.isEmpty()) {
+            return;
+        }
+        TextField path = null;
+        Map<TextField, String> template = new HashMap<>();
+        Map<TextField, String> proposed = new HashMap<>();
+        for (Attribute a : context) {
+            if (!(a.field() instanceof TextField field)) {
+                continue;
+            }
+            if (a.name().equals("path")) {
+                path = field;
+            } else if (templates.containsKey(a.name())) {
+                template.put(field, templates.get(a.name()));
+                proposed.put(field, field.getText());
+            }
+        }
+        if (path == null) {
+            return;
+        }
+        path.textProperty().addListener((obs, old, text) -> {
+            String name = text.trim();
+            name = name.startsWith("/") ? name.substring(1) : name;
+            for (Map.Entry<TextField, String> e : template.entrySet()) {
+                TextField field = e.getKey();
+                if (field.getText().equals(proposed.get(field))) {
+                    String value = fill(e.getValue(), name);
+                    field.setText(value);
+                    proposed.put(field, value);
+                }
+            }
+        });
     }
 
-    /** Liste d'attributs modifiable : valeur et suppression (✕). true/false s'affichent en bouton. */
-    private static final class AttributeEditor extends VBox {
+    private static boolean isBoolean(String value) {
+        return value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false");
+    }
 
-        private final VBox rows = new VBox(6);
+    private static ToggleButton booleanButton(String value) {
+        ToggleButton button = new ToggleButton();
+        button.getStyleClass().add("chip");
+        button.setUserData(value); // valeur d'origine, pour ne pas changer sa casse si rien ne bouge
+        button.setPrefWidth(70);
+        button.setMinWidth(70);
+        button.selectedProperty().addListener((obs, old, on) -> button.setText(on ? "true" : "false"));
+        button.setSelected(value.equalsIgnoreCase("true"));
+        button.setText(button.isSelected() ? "true" : "false");
+        return button;
+    }
 
-        private final double nameWidth;
-
-        AttributeEditor(Map<String, String> attributes, double nameWidth) {
-            super(10);
-            this.nameWidth = nameWidth;
-            setPadding(new Insets(8));
-            attributes.forEach(this::addRow);
-
-            getChildren().add(rows);
-        }
-
-        private void addRow(String name, String value) {
-            Label label = new Label(name);
-            label.setPrefWidth(nameWidth);
-            label.setMinWidth(nameWidth);
-            Control field = isBoolean(value) ? booleanButton(value) : new TextField(value);
-            if (field instanceof TextField) {
-                HBox.setHgrow(field, Priority.ALWAYS);
-            }
-            Button remove = new Button("✕");
-            HBox spacer = new HBox();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
-            HBox row = field instanceof TextField
-                    ? new HBox(6, label, field, remove)
-                    : new HBox(6, label, field, spacer, remove);
-            row.setAlignment(Pos.CENTER_LEFT);
-            remove.setOnAction(e -> rows.getChildren().remove(row));
-            rows.getChildren().add(row);
-        }
-
-        private static boolean isBoolean(String value) {
-            return value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false");
-        }
-
-        private static ToggleButton booleanButton(String value) {
-            ToggleButton button = new ToggleButton();
-            button.setUserData(value); // valeur d'origine, pour ne pas changer sa casse si rien ne bouge
-            button.setPrefWidth(90);
-            button.selectedProperty().addListener((obs, old, on) -> style(button, on));
-            button.setSelected(value.equalsIgnoreCase("true"));
-            style(button, button.isSelected());
-            return button;
-        }
-
-        private static void style(ToggleButton button, boolean on) {
-            button.setText(on ? "true" : "false");
-            button.setStyle(on
-                    ? "-fx-base: #2e7d32; -fx-text-fill: white; -fx-font-weight: bold;"
-                    : "-fx-base: #e0e0e0; -fx-text-fill: #666666;");
-        }
-
-        private static String booleanValue(ToggleButton button) {
-            String original = (String) button.getUserData();
-            return Boolean.parseBoolean(original) == button.isSelected() ? original : button.getText();
-        }
-
-        Map<String, String> values() {
-            Map<String, String> result = new LinkedHashMap<>();
-            for (Node node : rows.getChildren()) {
-                HBox row = (HBox) node;
-                String name = ((Label) row.getChildren().get(0)).getText();
-                Node field = row.getChildren().get(1);
-                result.put(name, field instanceof ToggleButton t ? booleanValue(t) : ((TextField) field).getText());
-            }
-            return result;
-        }
+    private static String booleanValue(ToggleButton button) {
+        String original = (String) button.getUserData();
+        return Boolean.parseBoolean(original) == button.isSelected() ? original : button.getText();
     }
 }

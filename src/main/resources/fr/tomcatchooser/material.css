@@ -1,0 +1,331 @@
+/* Thème Material de Tomcat Chooser : bleu 800 (#1565c0), surfaces, ombres douces. Mode clair ou sombre. */
+
+.root {
+    /* Couleurs du mode clair (le mode sombre les remplace plus bas) */
+    -md-bg: #eceff1;
+    -md-surface: #ffffff;
+    -md-appbar: #1565c0;
+    -md-primary: #1565c0;
+    -md-icon: #1565c0;
+    -md-danger: #c62828;
+    -md-text: #212121;
+    -md-text-2: #616161;
+    -md-hint: #9e9e9e;
+    -md-line: #e0e0e0;
+    -md-row-line: #eeeeee;
+    -md-hover: #f5f5f5;
+    -md-select: #e3f2fd;
+    -md-select-text: #0d47a1;
+    -md-chip: #e0e0e0;
+    -md-chip-text: #616161;
+    -md-thumb: #bdbdbd;
+    -md-thumb-hover: #9e9e9e;
+    -md-active: #2e7d32;
+    -md-inactive: #c62828;
+    -md-pending: #ef6c00;
+    -md-shadow: rgba(0, 0, 0, 0.18);
+    -md-overlay: rgba(21, 101, 192, 0.12);
+    -md-overlay-strong: rgba(21, 101, 192, 0.24);
+
+    -fx-font-family: "Segoe UI", "Roboto", sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: -md-bg;
+    -fx-focus-color: -md-primary;
+    -fx-faint-focus-color: transparent;
+    -fx-accent: -md-primary;
+    -fx-highlight-fill: #bbdefb;
+    -fx-highlight-text-fill: #0d47a1;
+}
+
+.root.dark {
+    -md-bg: #121417;
+    -md-surface: #1e2227;
+    -md-appbar: #0d3a74;
+    -md-primary: #1976d2;
+    -md-icon: #90caf9;
+    -md-danger: #ef9a9a;
+    -md-text: #e8eaed;
+    -md-text-2: #b0b6bd;
+    -md-hint: #7b838c;
+    -md-line: #3a4047;
+    -md-row-line: #2a2f35;
+    -md-hover: #262b31;
+    -md-select: #1f3a5c;
+    -md-select-text: #bbdefb;
+    -md-chip: #3a4047;
+    -md-chip-text: #b0b6bd;
+    -md-thumb: #4a5058;
+    -md-thumb-hover: #636a73;
+    -md-active: #66bb6a;
+    -md-inactive: #ef5350;
+    -md-pending: #ffa726;
+    -md-shadow: rgba(0, 0, 0, 0.55);
+    -md-overlay: rgba(144, 202, 249, 0.14);
+    -md-overlay-strong: rgba(144, 202, 249, 0.26);
+
+    -fx-base: #2b2f33;
+    -fx-background: #121417;
+    -fx-control-inner-background: #1e2227;
+    -fx-text-background-color: #e8eaed;
+    -fx-highlight-fill: #1f3a5c;
+    -fx-highlight-text-fill: #bbdefb;
+}
+
+.label {
+    -fx-text-fill: -md-text;
+}
+
+/* Barre d'application */
+.app-bar {
+    -fx-background-color: -md-appbar;
+    -fx-padding: 0 8 0 16;
+    -fx-min-height: 40;
+    -fx-pref-height: 40;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.30), 6, 0, 0, 2);
+}
+.app-bar .app-bar-title {
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+.app-bar .icon-button:hover, .app-bar .icon-button:focused {
+    -fx-background-color: rgba(255, 255, 255, 0.20);
+}
+.app-bar .icon-button:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.32);
+}
+
+/* Cartes */
+.card {
+    -fx-background-color: -md-surface;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-effect: dropshadow(gaussian, -md-shadow, 8, 0.05, 0, 2);
+}
+
+/* Champs de saisie : trait du bas, bleu quand ils ont le focus */
+.text-field {
+    -fx-background-color: -md-hint, -md-surface;
+    -fx-background-insets: 0, 0 0 1 0;
+    -fx-background-radius: 0;
+    -fx-padding: 6 2 5 2;
+    -fx-prompt-text-fill: -md-hint;
+    -fx-text-fill: -md-text;
+}
+.text-field:focused {
+    -fx-background-color: -md-primary, -md-surface;
+    -fx-background-insets: 0, 0 0 2 0;
+}
+
+/* Boutons-icônes ronds */
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 16;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+.icon-button:hover, .icon-button:focused {
+    -fx-background-color: -md-overlay;
+}
+.icon-button:pressed {
+    -fx-background-color: -md-overlay-strong;
+}
+.icon-button:disabled {
+    -fx-opacity: 0.38;
+}
+.icon {
+    -fx-fill: -md-icon;
+}
+.icon-danger {
+    -fx-fill: -md-danger;
+}
+.icon-on-primary {
+    -fx-fill: white;
+}
+
+/* Etat de Tomcat (texte en petit, coloré selon l'état) */
+.tomcat-state {
+    -fx-font-size: 11px;
+}
+.tomcat-state.started {
+    -fx-text-fill: -md-active;
+    -fx-font-weight: bold;
+}
+.tomcat-state.stopped {
+    -fx-text-fill: -md-inactive;
+}
+.tomcat-state.pending {
+    -fx-text-fill: -md-pending;
+    -fx-font-weight: bold;
+}
+.status-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: -md-text-2;
+}
+
+/* Tableau : sans titres, lignes séparées par un filet fin, sélection bleu clair */
+.table-view {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-color: -md-line;
+    -fx-border-radius: 4;
+}
+.table-view:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+.table-view .column-header-background {
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+    visibility: hidden;
+}
+.table-row-cell {
+    -fx-background-color: -md-surface;
+    -fx-border-color: transparent transparent -md-row-line transparent;
+}
+.table-row-cell:odd {
+    -fx-background-color: -md-surface;
+}
+.table-row-cell:filled:hover {
+    -fx-background-color: -md-hover;
+}
+.table-row-cell:filled:selected,
+.table-row-cell:filled:selected:focused,
+.table-row-cell:filled:selected:hover {
+    -fx-background-color: -md-select;
+}
+.table-row-cell:empty {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.table-cell {
+    -fx-border-color: transparent;
+    -fx-padding: 0 8 0 8;
+    -fx-alignment: CENTER_LEFT;
+    -fx-text-fill: -md-text;
+}
+.table-row-cell:filled:selected .table-cell {
+    -fx-text-fill: -md-select-text;
+}
+.dot-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 12;
+    -fx-padding: 2 4 2 4;
+    -fx-cursor: hand;
+}
+.dot-button:hover {
+    -fx-background-color: -md-overlay;
+}
+.dot-active {
+    -fx-fill: -md-active;
+}
+.dot-inactive {
+    -fx-fill: -md-inactive;
+}
+
+/* Ascenseur fin, sans flèches */
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+.scroll-bar > .track, .scroll-bar > .track-background {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.scroll-bar > .thumb {
+    -fx-background-color: -md-thumb;
+    -fx-background-radius: 4;
+    -fx-background-insets: 2;
+}
+.scroll-bar > .thumb:hover {
+    -fx-background-color: -md-thumb-hover;
+}
+.scroll-bar > .increment-button, .scroll-bar > .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-pref-height: 0;
+    -fx-pref-width: 0;
+}
+.scroll-bar > .increment-button > .increment-arrow,
+.scroll-bar > .decrement-button > .decrement-arrow {
+    -fx-shape: " ";
+    -fx-padding: 0;
+}
+.scroll-bar:vertical {
+    -fx-pref-width: 12;
+}
+
+/* Valeurs true / false : pastilles */
+.chip {
+    -fx-background-color: -md-chip;
+    -fx-background-radius: 14;
+    -fx-text-fill: -md-chip-text;
+    -fx-padding: 3 14 3 14;
+    -fx-cursor: hand;
+}
+.chip:selected {
+    -fx-background-color: #2e7d32;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+.section-caption {
+    -fx-text-fill: -md-icon;
+    -fx-font-weight: bold;
+}
+.separator .line {
+    -fx-border-color: -md-line;
+}
+.attribute-name {
+    -fx-text-fill: -md-text-2;
+}
+
+/* Boîtes de dialogue */
+.dialog-pane {
+    -fx-background-color: -md-surface;
+    -fx-font-size: 13px;
+}
+.dialog-pane > .header-panel {
+    -fx-background-color: -md-appbar;
+    -fx-padding: 14 16 14 16;
+}
+.dialog-pane > .header-panel > .label {
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+.alert.error .dialog-pane > .header-panel,
+.dialog-pane.error > .header-panel {
+    -fx-background-color: #c62828;
+}
+.dialog-pane > .content.label {
+    -fx-padding: 14 16 6 16;
+    -fx-text-fill: -md-text;
+}
+.dialog-pane .button-bar,
+.dialog-pane .button-bar > .container {
+    -fx-background-color: -md-surface;
+}
+.dialog-pane .button-bar > .container {
+    -fx-padding: 8 12 12 12;
+}
+.dialog-pane .button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 4;
+    -fx-text-fill: -md-icon;
+    -fx-font-weight: bold;
+    -fx-padding: 7 16 7 16;
+    -fx-cursor: hand;
+}
+.dialog-pane .button:hover, .dialog-pane .button:focused {
+    -fx-background-color: -md-overlay;
+}
+.dialog-pane .button:default {
+    -fx-background-color: -md-primary;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 3, 0, 0, 1);
+}
+.dialog-pane .button:default:hover, .dialog-pane .button:default:focused {
+    -fx-background-color: -md-appbar;
+}

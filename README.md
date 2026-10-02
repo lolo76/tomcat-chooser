@@ -9,24 +9,59 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
 
 - Au démarrage, le fichier ouvert est `C:\Tomcat70\conf\server.xml`
   (ou le dernier fichier choisi, mémorisé automatiquement).
-- À gauche du chemin, trois icônes bleues : le dossier choisit un autre `server.xml` (on peut aussi taper
-  le chemin puis Entrée), ↻ recharge le fichier, et le crayon ouvre `server.xml` dans l'éditeur
-  du système (Bloc-notes à défaut) ; rechargez après l'avoir enregistré.
-- Chaque ligne affiche le nom de l'application (le `path` sans le `/`, ou ROOT) et un bouton d'état : **Actif** (vert) ou **Inactif** (gris).
-- Cliquer sur **Actif** commente le Context entier dans un seul bloc `<!-- … -->` ;
-  cliquer sur **Inactif** le décommente (y compris un bloc `<!-- … -->` sur plusieurs lignes).
-- La fenêtre s'ajuste pour afficher toutes les lignes, sans dépasser la taille de l'écran.
-- Le champ de recherche filtre la liste sur le nom de l'application.
-- En bas à droite, un voyant indique si **Tomcat est démarré ou arrêté** (vérifié toutes les 3 s).
-  Il teste sur localhost le port HTTP du `server.xml` choisi (jamais le port d'arrêt),
-  quel que soit le lanceur (Eclipse, startup.bat, service).
-- Le bouton **Ajouter**, sous la liste, crée un nouveau Context : saisissez le `path` (sans `/`,
-  vide pour ROOT), le `docBase` et `reloadable`. Il est inséré actif après le dernier Context,
-  avec la même indentation.
-- Un **double-clic** sur une ligne ouvre une fenêtre pour modifier les attributs du Context
-  (path, docBase, reloadable, workDir…) et ceux de son élément `<Loader>` :
-  modifier une valeur ou supprimer (✕) un attribut. Les valeurs true/false sont des boutons.
-  Cela fonctionne aussi pour un Context inactif (commenté).
+- L'interface suit le style **Material** : barre d'application bleue (« Choisi ton projet »), deux cartes blanches à ombre douce,
+  champs soulignés, boutons-icônes ronds avec infobulle, boîtes de dialogue à en-tête coloré.
+- En haut à droite de la barre bleue, un bouton choisit le **thème** : clair (soleil), sombre (lune) ou celui du
+  système (demi-disque, qui suit Windows et ses changements). Un clic passe au suivant ; le choix est mémorisé.
+- La première carte regroupe le chemin du `server.xml` et Tomcat.
+  À droite du chemin, deux icônes : le dossier choisit un autre `server.xml` (on peut aussi taper
+  le chemin puis Entrée), la feuille ouvre `server.xml` dans l'éditeur du système (Bloc-notes à défaut).
+- Tout est actualisé toutes les 3 s : l'état de Tomcat, et la liste si `server.xml` a changé sur le disque
+  (modifié à la main ou par un autre outil). La ligne sélectionnée et la recherche sont conservées.
+- Sous le chemin, dans la même carte, l'état et les commandes de **Tomcat** : libellé à gauche, boutons à droite
+  (Tomcat démarré / arrêté, en petit). Il teste sur localhost le port HTTP du `server.xml` choisi
+  (jamais le port d'arrêt), quel que soit le lanceur (Eclipse, startup.bat, service).
+  - ▶ / ■ **démarre** ou **arrête** Tomcat, ↻ le **redémarre** (arrêt, puis démarrage).
+  - **Avec Eclipse (recommandé)** : si le plugin *Eclipse MCP Server* (vogella) est actif et que le plugin
+    *Sysdeo Tomcat Launcher* pilote le Tomcat de ce `server.xml` (préférence `tomcatConfigFile`), les boutons
+    exécutent les commandes Sysdeo « Démarrer Tomcat » et « Arrêter Tomcat » dans Eclipse : console et
+    débogueur d'Eclipse comme d'habitude. Les infobulles indiquent « avec Sysdeo (dans Eclipse) ».
+    Prérequis : Eclipse ouvert, serveur MCP activé (*Preferences > General > MCP Server*, port 8642 par défaut,
+    changeable par `-Dtomcatchooser.mcpPort=…`), token lu dans `~/.eclipse/com.vogella.eclipse.mcp.server/token`.
+    Tant que Tomcat finit de démarrer (plus d'une minute pour Areo), Sysdeo perd l'ordre d'arrêt : l'application
+    le renvoie toutes les 10 s jusqu'à l'arrêt effectif (4 minutes au plus).
+  - **Sans Eclipse** (autre `server.xml`, Eclipse fermé ou plugin absent) : l'arrêt envoie la commande d'arrêt sur
+    le port de `<Server port=… shutdown=…>`, comme `shutdown.bat`, et le démarrage lance
+    `bin\catalina.bat jpda start` du Tomcat du `server.xml`, dans sa propre console, en mode débogage sur le
+    port 8000 (le JDK et la mémoire se règlent dans `bin\setenv.bat`). Pour déboguer : *Run > Debug
+    Configurations > Remote Java Application*, host `localhost`, port `8000`.
+- Une seconde carte, dessous, regroupe le champ de recherche (il filtre la liste sur le nom de l'application)
+  et le tableau. Sous le tableau, un statut indique le nombre de Context actifs (« 3 actifs sur 13 »),
+  et le nombre affiché quand la recherche filtre la liste.
+- Chaque ligne affiche un point **vert** (actif) ou **rouge** (inactif) et le nom de l'application
+  (le `path` sans le `/`, ou ROOT). Cliquer sur le point vert commente le Context entier dans un seul
+  bloc `<!-- … -->` ; cliquer sur le point rouge le décommente (y compris un bloc sur plusieurs lignes).
+- La liste est triée : les Context actifs d'abord, puis par ordre alphabétique. Activer ou désactiver un
+  Context ne change pas sa place (pas de nouveau tri) ; le tri est refait au chargement, après un ajout,
+  une duplication, une modification ou une suppression, et quand `server.xml` change sur le disque.
+- La fenêtre a une taille fixe, qui montre 10 lignes : au-delà, la liste a son ascenseur ; en dessous,
+  les lignes restantes sont simplement vides.
+- En haut de la seconde carte, quatre boutons en icônes (sans texte, avec infobulle) agissent sur les Context :
+  - **+ Ajouter** ouvre exactement la même fenêtre que Modifier : path, reloadable, docBase, workDir, et un
+    Loader prérempli comme celui déjà utilisé dans le fichier, sans ses attributs `debug` et
+    `useSystemClassLoaderAsParent` (videz son className pour ne pas en mettre).
+    docBase et workDir sont préremplis d'après les derniers Context du fichier (par exemple
+    `…\netisys-areo\<nom>\src\main\webapp`) et suivent le path que vous tapez, tant que vous ne les avez pas
+    modifiés à la main. Le Context est inséré actif après le dernier, avec la même indentation.
+  - **Dupliquer** (deux feuilles) copie le Context sélectionné avec ses éléments enfants (Loader, Resource…).
+    La fenêtre est préremplie, avec le path suffixé `_copie`. La copie est insérée active après le dernier
+    Context, même si l'original est commenté. Un path déjà utilisé est refusé.
+  - **Modifier** (crayon, ou un **double-clic** sur une ligne) ouvre la fenêtre de modification des attributs
+    du Context (path, docBase, reloadable, workDir…) puis de son élément `<Loader>`. Les valeurs true/false
+    sont des boutons, sur la ligne du champ qui les précède. Cela marche aussi pour un Context inactif.
+  - **Supprimer** (corbeille) retire le Context sélectionné de `server.xml`, actif ou commenté, après une
+    confirmation qui indique le chemin complet du `server.xml` modifié.
+- Il n'y a pas de barre de message : les erreurs s'affichent dans une boîte de dialogue.
 - Seule la zone du Context change : indentation, autres commentaires, fins de ligne et encodage
   du fichier sont conservés.
 - À la première modification, `server.xml.orig` est créé (copie du fichier d'origine, jamais écrasée).

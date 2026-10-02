@@ -313,6 +313,93 @@ class ServerXmlTest {
     }
 
     @Test
+    void dupliqueUnContextCommenteAvecSesEnfants() throws Exception {
+        Path f = write(LIGNE_PAR_LIGNE);
+        ServerXml xml = ServerXml.load(f);
+        ContextEntry sireo = xml.contexts().get(0);
+        Map<String, String> context = xml.attributes(sireo, "Context");
+        Map<String, String> loader = xml.attributes(sireo, "Loader");
+        context.put("path", "Sireo_CG44_copie");
+        loader.put("debug", "0");
+        ContextEntry copy = xml.duplicateContext(sireo, Map.of("Context", context, "Loader", loader));
+
+        assertEquals("/Sireo_CG44_copie", copy.path());
+        assertFalse(copy.commented());
+        assertEquals(3, xml.contexts().size());
+        String text = Files.readString(f);
+        // L'original reste commenté et intact ; la copie, active, suit le dernier Context.
+        assertTrue(text.startsWith(LIGNE_PAR_LIGNE.substring(0, LIGNE_PAR_LIGNE.indexOf("        <Context path=\"/autre\""))), text);
+        assertTrue(text.contains("""
+                        <Context path="/autre" docBase="C:/apps/autre"/>
+                        <Context path="/Sireo_CG44_copie" reloadable="false" docBase="C:\\eclipse\\workspace\\Sireo_CG44\\src\\main\\webapp" workDir="C:\\eclipse\\workspace\\Sireo_CG44\\work" >
+                \t<Logger className="org.apache.catalina.logger.SystemOutLogger" verbosity="4" timestamp="true"/>
+                \t<Loader className="org.apache.catalina.loader.DevLoader" reloadable="true" debug="0" useSystemClassLoaderAsParent="false" />
+                </Context>
+                      </Host>""".replace("\n", "\r\n")), text);
+    }
+
+    @Test
+    void dupliqueUnContextActifEtRefuseUnPathExistant() throws Exception {
+        Path f = write(SERVER_XML);
+        ServerXml xml = ServerXml.load(f);
+        ContextEntry root = xml.contexts().get(3);
+        Map<String, String> context = xml.attributes(root, "Context");
+        assertThrows(java.io.IOException.class, () -> xml.duplicateContext(root, Map.of("Context", context)));
+        context.put("path", "/copie");
+        Map<String, Map<String, String>> byTag = new java.util.HashMap<>();
+        byTag.put("Context", context);
+        byTag.put("Loader", null);
+        xml.duplicateContext(root, byTag);
+        assertTrue(Files.readString(f).contains("        </Context>\r\n"
+                + "        <Context path=\"/copie\" docBase='C:/apps/root'>\r\n"
+                + "          <Parameter name=\"x\" value=\"1\"/>\r\n"
+                + "        </Context>\r\n"
+                + "      </Host>"), Files.readString(f));
+    }
+
+    @Test
+    void ajouteUnContextAvecSonLoader() throws Exception {
+        Path f = write(LIGNE_PAR_LIGNE);
+        ServerXml xml = ServerXml.load(f);
+        Map<String, String> context = new java.util.LinkedHashMap<>();
+        context.put("path", "nouveau");
+        context.put("reloadable", "false");
+        context.put("docBase", "C:/apps/nouveau");
+        context.put("workDir", "");
+        Map<String, String> loader = new java.util.LinkedHashMap<>();
+        loader.put("className", "org.apache.catalina.loader.DevLoader");
+        loader.put("reloadable", "true");
+        ContextEntry added = xml.addContextTags(Map.of("Context", context, "Loader", loader));
+        assertEquals("/nouveau", added.path());
+        assertTrue(Files.readString(f).contains("        <Context path=\"/autre\" docBase=\"C:/apps/autre\"/>\r\n"
+                + "        <Context path=\"/nouveau\" reloadable=\"false\" docBase=\"C:/apps/nouveau\">\r\n"
+                + "        \t<Loader className=\"org.apache.catalina.loader.DevLoader\" reloadable=\"true\"/>\r\n"
+                + "        </Context>\r\n"
+                + "      </Host>"), Files.readString(f));
+        assertEquals("true", ServerXml.load(f).attributes(added, "Loader").get("reloadable"));
+    }
+
+    @Test
+    void supprimeUnContextActifOuCommente() throws Exception {
+        Path f = write(SERVER_XML);
+        ServerXml xml = ServerXml.load(f);
+        xml.deleteContext(xml.contexts().get(0));
+        assertEquals(SERVER_XML.replace("        <Context path=\"/appli1\" docBase=\"C:/apps/appli1\" reloadable=\"true\"/>\r\n", ""),
+                Files.readString(f));
+        xml.deleteContext(xml.contexts().get(1)); // appli3, commenté sur plusieurs lignes
+        assertFalse(Files.readString(f).contains("appli3"), Files.readString(f));
+        assertTrue(Files.readString(f).contains("        <!-- <Context path=\"/appli2\" docBase=\"C:/apps/appli2\"/> -->\r\n"
+                + "        <!-- Un commentaire ordinaire -->"), Files.readString(f));
+        assertEquals(2, ServerXml.load(f).contexts().size());
+
+        Path g = write(LIGNE_PAR_LIGNE);
+        ServerXml lignes = ServerXml.load(g);
+        lignes.deleteContext(lignes.contexts().get(0));
+        assertFalse(Files.readString(g).contains("Sireo_CG44"), Files.readString(g));
+        assertFalse(Files.readString(g).contains("Loader"), Files.readString(g));
+    }
+
+    @Test
     void refuseUnDoublonOuSansDocBase() throws Exception {
         ServerXml xml = ServerXml.load(write(SERVER_XML));
         assertThrows(java.io.IOException.class, () -> xml.addContext(Map.of("path", "/appli2", "docBase", "x")));

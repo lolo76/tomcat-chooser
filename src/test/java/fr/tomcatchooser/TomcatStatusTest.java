@@ -24,6 +24,42 @@ class TomcatStatusTest {
     }
 
     @Test
+    void envoieLaCommandeDArretDeServerXml() throws Exception {
+        try (ServerSocket fake = new ServerSocket(0)) {
+            TomcatStatus status = TomcatStatus.fromServerXml(
+                    "<Server port=\"" + fake.getLocalPort() + "\" shutdown=\"STOP-ICI\"><Connector port=\"1\"/></Server>");
+            assertEquals("STOP-ICI", status.shutdownCommand());
+            status.shutdown();
+            try (java.net.Socket received = fake.accept()) {
+                assertEquals("STOP-ICI", new String(received.getInputStream().readAllBytes(),
+                        java.nio.charset.StandardCharsets.ISO_8859_1));
+            }
+        }
+    }
+
+    @Test
+    void attendQueLePortDArretSOuvre() throws Exception {
+        int port;
+        try (ServerSocket s = new ServerSocket(0)) {
+            port = s.getLocalPort();
+        }
+        TomcatStatus status = new TomcatStatus(port, -1, "SHUTDOWN");
+        java.util.concurrent.CompletableFuture<String> received = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                Thread.sleep(700); // Tomcat ouvre son port d'arrêt un peu après son port HTTP
+                try (ServerSocket late = new ServerSocket(port); java.net.Socket c = late.accept()) {
+                    return new String(c.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1);
+                }
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        status.shutdown(5000);
+        assertEquals("SHUTDOWN", received.get());
+        org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, () -> status.shutdown(300));
+    }
+
+    @Test
     void demarreQuandLePortHttpEcoute() throws Exception {
         try (ServerSocket fake = new ServerSocket(0)) {
             int port = fake.getLocalPort();
