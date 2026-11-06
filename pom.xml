@@ -63,7 +63,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <!-- 3.14.1 minimum : embarque ASM 9.8, qui sait lire le bytecode Java 25 (major 69)
+                     du module-info du projet — sinon le build échoue sur certains runners -->
+                <version>3.15.0</version>
                 <configuration>
                     <!-- Aucun processeur d'annotations : évite que ceux configurés
                          dans l'espace de travail Eclipse (ex. Nalu) s'exécutent ici -->
