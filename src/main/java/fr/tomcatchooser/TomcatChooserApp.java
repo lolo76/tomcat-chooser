@@ -49,7 +49,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.shape.Circle;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -61,19 +60,18 @@ import javafx.util.Duration;
 
 /**
  * Fenêtre principale : état et contrôle de Tomcat, puis la liste des Context de server.xml avec
- * un point vert (actif) ou rouge (inactif) pour (dé)commenter chacun. Tout est actualisé toutes les 3 s.
+ * un badge « Actif » (vert) ou « Inactif » (rouge) pour (dé)commenter chacun. Tout est actualisé toutes les 3 s.
  */
 public class TomcatChooserApp extends Application {
 
     static final Path DEFAULT_SERVER_XML = defaultServerXml();
     private static final String PREF_LAST_FILE = "lastServerXml";
     private static final double ROW_HEIGHT = 30;
-    /** Colonne du point vert / rouge : juste sa largeur. */
-    private static final double STATUS_WIDTH = 36;
+    /** Colonne du badge Actif / Inactif : juste sa largeur. */
+    private static final double STATUS_WIDTH = 76;
     private static final double APPLICATION_WIDTH = 236;
     /** Nombre maximal de lignes affichées avant l'ascenseur. */
     private static final int MAX_ROWS = 10;
-    private static final double DOT_RADIUS = 7;
     /** Taille du texte d'état de Tomcat, plus petit que le reste. */
     private static final double STATE_FONT_SIZE = 11;
     /** Icône « dossier » (Material Design). */
@@ -144,8 +142,6 @@ public class TomcatChooserApp extends Application {
 
     private Theme theme = Theme.SYSTEM;
     private final Button themeButton = iconButton(THEME_SYSTEM_ICON);
-    /** Sous le tableau : nombre de Context actifs. */
-    private final Label statusLabel = new Label();
     private final Button addButton = iconButton(ADD_ICON);
     private final Button duplicateButton = iconButton(COPY_ICON);
     private final Button editButton = iconButton(EDIT_ICON);
@@ -253,7 +249,6 @@ public class TomcatChooserApp extends Application {
         search.textProperty().addListener((obs, old, text) -> {
             String q = text.trim().toLowerCase();
             filtered.setPredicate(c -> q.isEmpty() || c.displayPath().toLowerCase().contains(q));
-            updateCount();
             fitWindowToRows();
         });
 
@@ -287,11 +282,8 @@ public class TomcatChooserApp extends Application {
         VBox.setMargin(card, new Insets(10, 10, 0, 10));
 
         // Seconde carte, sous la première : la recherche et le tableau.
-        statusLabel.getStyleClass().add("status-label");
-        statusLabel.setMinHeight(16);
-        statusLabel.setPrefHeight(16);
         tomcatState.getStyleClass().add("tomcat-state");
-        listBox = new VBox(8, buttonRow, search, table, statusLabel);
+        listBox = new VBox(8, buttonRow, search, table);
         listBox.getStyleClass().add("card");
         VBox.setVgrow(table, Priority.NEVER);
         header = new VBox(appBar, card);
@@ -332,17 +324,6 @@ public class TomcatChooserApp extends Application {
         startMonitor();
     }
 
-    /** Statut sous le tableau : nombre de Context actifs (et nombre affiché si une recherche filtre la liste). */
-    private void updateCount() {
-        long active = contexts.stream().filter(c -> !c.commented()).count();
-        int total = contexts.size();
-        String text = total == 0 ? "" : active + (active > 1 ? " actifs" : " actif") + " sur " + total;
-        if (total > 0 && filtered.size() != total) {
-            text += " · " + filtered.size() + (filtered.size() > 1 ? " affichés" : " affiché");
-        }
-        statusLabel.setText(text);
-    }
-
     /** Applique le thème choisi : classe « dark » sur la racine, icône et infobulle du bouton. */
     private void applyTheme() {
         boolean dark = theme == Theme.DARK
@@ -377,14 +358,13 @@ public class TomcatChooserApp extends Application {
         TableColumn<ContextEntry, ContextEntry> action = new TableColumn<>("Statut");
         action.setCellValueFactory(c -> new ReadOnlyObjectWrapper<>(c.getValue()));
         action.setCellFactory(col -> new TableCell<>() {
-            // Point vert (actif) ou rouge (inactif) ; un clic bascule vers l'autre état.
-            private final Circle dot = new Circle(DOT_RADIUS);
-            private final Button button = new Button(null, dot);
+            // Badge « Actif » (vert) ou « Inactif » (rouge) ; un clic bascule vers l'autre état.
+            private final Button badge = new Button();
 
             {
-                button.getStyleClass().add("dot-button");
-                button.setOnAction(e -> toggle(getItem()));
-                tip(button, "");
+                badge.getStyleClass().add("status-badge");
+                badge.setOnAction(e -> toggle(getItem()));
+                tip(badge, "");
                 setAlignment(Pos.CENTER);
             }
 
@@ -394,12 +374,13 @@ public class TomcatChooserApp extends Application {
                 if (empty || item == null) {
                     setGraphic(null);
                 } else {
-                    dot.getStyleClass().removeAll("dot-active", "dot-inactive");
-                    dot.getStyleClass().add(item.commented() ? "dot-inactive" : "dot-active");
-                    button.getTooltip().setText(item.commented()
+                    badge.setText(item.commented() ? "Inactif" : "Actif");
+                    badge.getStyleClass().removeAll("badge-active", "badge-inactive");
+                    badge.getStyleClass().add(item.commented() ? "badge-inactive" : "badge-active");
+                    badge.getTooltip().setText(item.commented()
                             ? "Inactif : cliquer pour activer (décommenter)"
                             : "Actif : cliquer pour désactiver (commenter)");
-                    setGraphic(button);
+                    setGraphic(badge);
                 }
             }
         });
@@ -564,7 +545,6 @@ public class TomcatChooserApp extends Application {
         addButton.setDisable(true);
         tomcatStatus = null;
         contexts.clear();
-        updateCount();
         placeholder.setText(reason);
         fitWindowToRows();
     }
@@ -1065,7 +1045,6 @@ public class TomcatChooserApp extends Application {
             rankByIndex = ranks;
         }
         contexts.setAll(all);
-        updateCount();
         table.refresh();
         fitWindowToRows();
     }
@@ -1092,7 +1071,7 @@ public class TomcatChooserApp extends Application {
         double tableHeight = headerHeight + rows * ROW_HEIGHT + borders;
 
         double width = root.prefWidth(-1);
-        // Hors tableau : marge et marges de la carte du bas, et ce qui l'entoure (boutons, recherche, statut).
+        // Hors tableau : marge et marges de la carte du bas, et ce qui l'entoure (boutons, recherche).
         double listBoxExtra = listBox.getInsets().getTop() + listBox.getInsets().getBottom()
                 + BorderPane.getMargin(listBox).getTop() + (listBox.getChildren().size() - 1) * listBox.getSpacing();
         for (Node child : listBox.getChildren()) {

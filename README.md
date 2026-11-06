@@ -36,11 +36,10 @@ Tomcat et permet de les **commenter / décommenter d'un clic**.
     port 8000 (le JDK et la mémoire se règlent dans `bin\setenv.bat`). Pour déboguer : *Run > Debug
     Configurations > Remote Java Application*, host `localhost`, port `8000`.
 - Une seconde carte, dessous, regroupe le champ de recherche (il filtre la liste sur le nom de l'application)
-  et le tableau. Sous le tableau, un statut indique le nombre de Context actifs (« 3 actifs sur 13 »),
-  et le nombre affiché quand la recherche filtre la liste.
-- Chaque ligne affiche un point **vert** (actif) ou **rouge** (inactif) et le nom de l'application
-  (le `path` sans le `/`, ou ROOT). Cliquer sur le point vert commente le Context entier dans un seul
-  bloc `<!-- … -->` ; cliquer sur le point rouge le décommente (y compris un bloc sur plusieurs lignes).
+  et le tableau.
+- Chaque ligne affiche un badge **Actif** (vert) ou **Inactif** (rouge) et le nom de l'application
+  (le `path` sans le `/`, ou ROOT). Cliquer sur le badge Actif commente le Context entier dans un seul
+  bloc `<!-- … -->` ; cliquer sur le badge Inactif le décommente (y compris un bloc sur plusieurs lignes).
 - La liste est triée : les Context actifs d'abord, puis par ordre alphabétique. Activer ou désactiver un
   Context ne change pas sa place (pas de nouveau tri) ; le tri est refait au chargement, après un ajout,
   une duplication, une modification ou une suppression, et quand `server.xml` change sur le disque.

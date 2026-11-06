@@ -159,10 +159,6 @@
     -fx-text-fill: -md-pending;
     -fx-font-weight: bold;
 }
-.status-label {
-    -fx-font-size: 11px;
-    -fx-text-fill: -md-text-2;
-}
 
 /* Tableau : sans titres, lignes séparées par un filet fin, sélection bleu clair */
 .table-view {
@@ -210,20 +206,31 @@
 .table-row-cell:filled:selected .table-cell {
     -fx-text-fill: -md-select-text;
 }
-.dot-button {
-    -fx-background-color: transparent;
-    -fx-background-radius: 12;
-    -fx-padding: 2 4 2 4;
+/* Badge « Actif » / « Inactif » : pastille cliquable qui (dé)commente le Context */
+.status-badge {
+    -fx-background-color: -md-active;
+    -fx-background-radius: 14;
+    -fx-background-insets: 0;
+    -fx-text-fill: white;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 10 2 10;
     -fx-cursor: hand;
 }
-.dot-button:hover {
-    -fx-background-color: -md-overlay;
+.status-badge:hover {
+    -fx-background-color: derive(-md-active, -12%);
 }
-.dot-active {
-    -fx-fill: -md-active;
+.status-badge:pressed, .status-badge:focused {
+    -fx-background-color: derive(-md-active, -24%);
 }
-.dot-inactive {
-    -fx-fill: -md-inactive;
+.status-badge.badge-inactive {
+    -fx-background-color: -md-inactive;
+}
+.status-badge.badge-inactive:hover {
+    -fx-background-color: derive(-md-inactive, -12%);
+}
+.status-badge.badge-inactive:pressed, .status-badge.badge-inactive:focused {
+    -fx-background-color: derive(-md-inactive, -24%);
 }
 
 /* Ascenseur fin, sans flèches */
