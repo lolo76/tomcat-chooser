@@ -68,7 +68,7 @@ public class TomcatChooserApp extends Application {
     private static final String PREF_LAST_FILE = "lastServerXml";
     private static final double ROW_HEIGHT = 30;
     /** Colonne du badge Actif / Inactif : juste sa largeur. */
-    private static final double STATUS_WIDTH = 76;
+    private static final double STATUS_WIDTH = 90;
     private static final double APPLICATION_WIDTH = 236;
     /** Nombre maximal de lignes affichées avant l'ascenseur. */
     private static final int MAX_ROWS = 10;
