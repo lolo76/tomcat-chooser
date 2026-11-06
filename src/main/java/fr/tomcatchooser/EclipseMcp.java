@@ -79,7 +79,8 @@ final class EclipseMcp {
         if (configured == null) {
             return false;
         }
-        return samePath(Paths.get(configured), serverXml);
+        // Eclipse sous Windows mémorise des antislashs, que Paths.get() n'interprète que sur Windows
+        return samePath(Paths.get(configured.replace('\\', '/')), serverXml);
     }
 
     /** Exécute une commande du workbench, comme son bouton de barre d'outils. */

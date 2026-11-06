@@ -161,11 +161,13 @@ class EclipseMcpTest {
     void reconnaitLeServeurQuePiloteSysdeo() throws Exception {
         toolText = "{\"preferences\": [{\"key\": \"tomcatConfigFile\", \"effective\": \"C:\\\\Tomcat70\\\\conf\\\\server.xml\"}]}";
         EclipseMcp mcp = client();
-        assertTrue(mcp.drives(Paths.get("C:\\Tomcat70\\conf\\server.xml")));
+        // Chemins écrits avec des slashes : Paths.get("C:\\...") ne désigne le disque C:
+        // que sur Windows, le test doit pouvoir tourner sur Mac et Linux aussi.
+        assertTrue(mcp.drives(Paths.get("C:/Tomcat70/conf/server.xml")));
         assertTrue(mcp.drives(Paths.get("c:/tomcat70/conf/../conf/server.xml")));
-        assertFalse(mcp.drives(Paths.get("C:\\Tomcat90\\conf\\server.xml")));
+        assertFalse(mcp.drives(Paths.get("C:/Tomcat90/conf/server.xml")));
         toolText = "{\"preferences\": []}";
-        assertFalse(mcp.drives(Paths.get("C:\\Tomcat70\\conf\\server.xml")));
+        assertFalse(mcp.drives(Paths.get("C:/Tomcat70/conf/server.xml")));
     }
 
     @Test
